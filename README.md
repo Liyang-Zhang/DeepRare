@@ -1,4 +1,4 @@
-# DeepRare: An Agentic System for Rare Disease Diagnosis with Traceable Reasoning
+# [Nature] DeepRare: An Agentic System for Rare Disease Diagnosis with Traceable Reasoning
 
 <div style='display:flex; gap: 0.6rem; '>
 <a href='https://arxiv.org/pdf/2506.20430'><img src='https://img.shields.io/badge/Arxiv-PDF-red'></a>
@@ -155,7 +155,7 @@ Follow these steps to reproduce the results:
 
 ## Web Application
 
-Due to complex environment setup and LLM API requirements, we strongly recommend using our pre-deployed web application [DeepRare](http://raredx.cn) for easy access and testing. 
+Due to complex environment setup and LLM API requirements, we strongly recommend using our pre-deployed web application [DeepRare](http://deeprare.cn) for easy access and testing. 
 
 For web engineering implementation, we package this workflow using FastAPI with DeepSeek-V3 locally deployed on **16 Ascend 910B cards** serving as the central host to ensure system stability and data security. The system architecture employs a microservices design with Redis for session management and SQL databases for persistent data storage. More details can be found in our paper (Section 11.4).
 
@@ -165,11 +165,13 @@ For web engineering implementation, we package this workflow using FastAPI with 
 
 ## Reference:
 ```latex
-@article{zhao2025agentic,
-   title={An agentic system for rare disease diagnosis with traceable reasoning},
-   author={Zhao, Weike and Wu, Chaoyi and Fan, Yanjie and Zhang, Xiaoman and Qiu, Pengcheng and Sun, Yuze and Zhou, Xiao and Wang, Yanfeng and Sun, Xin and Zhang, Ya and others},
-   journal={arXiv preprint arXiv:2506.20430},
-   year={2025}
+@article{zhao2026agentic,
+  title={An agentic system for rare disease diagnosis with traceable reasoning},
+  author={Zhao, Weike and Wu, Chaoyi and Fan, Yanjie and Qiu, Pengcheng and Zhang, Xiaoman and Sun, Yuze and Zhou, Xiao and Zhang, Shuju and Peng, Yu and Wang, Yanfeng and others},
+  journal={Nature},
+  pages={1--10},
+  year={2026},
+  publisher={Nature Publishing Group UK London}
 }
 ```
 
