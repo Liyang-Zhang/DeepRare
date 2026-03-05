@@ -103,9 +103,9 @@ def Check_Patient_Agent(patient_info, retrieved_patient_case, handler):
                                         "Patient 2 phenotype: " + retrieved_patient_case
                                         )
     if 'Yes' in output.lower():
-        return False
-    else:
         return True
+    else:
+        return False
 
 
 def Interaction_Agent(patient_info, primary_diagnosis, handler):
