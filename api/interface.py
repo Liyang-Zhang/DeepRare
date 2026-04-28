@@ -1,28 +1,34 @@
-from openai import OpenAI
-import anthropic
-import google.generativeai as genai
-
 class Openai_api:
-    def __init__(self, api_key, model):
+    def __init__(self, api_key, model, base_url=None, timeout=60):
+        from openai import OpenAI
 
-        self.client = OpenAI(
-            api_key=api_key
-        )
+        client_kwargs = {"api_key": api_key, "timeout": timeout}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+
+        self.client = OpenAI(**client_kwargs)
         self.model = model
+        self.base_url = base_url
+        self.timeout = timeout
 
         self.gpt4_tokens = 0
         self.chatgpt_tokens = 0
         self.gpt_4o_mini_tokens = 0
 
-    def get_completion(self, system_prompt, prompt, seed=42):
+    def get_completion(self, system_prompt, prompt, seed=42, temperature=None):
         try:       
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                seed=seed,
-                messages=[
+            request_kwargs = {
+                "model": self.model,
+                "seed": seed,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
-                ]
+                ],
+            }
+            if temperature is not None:
+                request_kwargs["temperature"] = temperature
+            completion = self.client.chat.completions.create(
+                **request_kwargs
             )
             
             return str(completion.choices[0].message.content)
@@ -42,16 +48,19 @@ class Openai_api:
             print("Error in summarizing the text. Return the first 1000 characters.")
             return text[:1000]
     
-    def mini_completion(self, system_prompt, prompt, seed=42):
+    def mini_completion(self, system_prompt, prompt, seed=42, temperature=None):
         try:       
-            completion = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                seed=seed,
-                messages=[
+            request_kwargs = {
+                "model": "gpt-4o-mini",
+                "seed": seed,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
-                ]
-            )
+                ],
+            }
+            if temperature is not None:
+                request_kwargs["temperature"] = temperature
+            completion = self.client.chat.completions.create(**request_kwargs)
             
             return str(completion.choices[0].message.content)
         except Exception as e:
@@ -63,6 +72,7 @@ class Openai_api:
 
 class deepseek_api:
     def __init__(self, api_key, model):
+        from openai import OpenAI
 
         self.client = OpenAI(
                 api_key=api_key, 
@@ -92,6 +102,9 @@ class deepseek_api:
 
 class gemini_api:
     def __init__(self, api_key, model):
+        import google.generativeai as genai
+
+        self._genai = genai
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(model)
 
@@ -107,6 +120,8 @@ class gemini_api:
 
 class claude_api:
     def __init__(self, api_key, model):
+        import anthropic
+
         self.client = anthropic.Anthropic(
             api_key=api_key
         )

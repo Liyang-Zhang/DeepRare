@@ -1,0 +1,1461 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>yk-FERTA 任务结果页（演示版）</title>
+  <style>
+    :root {
+      --bg: #f2f6f4;
+      --panel: #ffffff;
+      --line: #cfd9d3;
+      --ink: #17352b;
+      --muted: #5a7268;
+      --brand: #1d6b52;
+      --brand-soft: #e5f2ec;
+      --ok: #1f8e56;
+      --warn: #b7791f;
+      --bad: #b83232;
+      --shadow: 0 12px 28px rgba(17, 53, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(29,107,82,0.12), transparent 28%),
+        linear-gradient(180deg, #f7fbf8, var(--bg));
+    }
+    .wrap {
+      max-width: 1340px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      background: linear-gradient(140deg, #103f33 0%, #1d6b52 58%, #4b8f74 100%);
+      color: #fff;
+      border-radius: 20px;
+      padding: 22px 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 18px 42px rgba(16, 63, 51, 0.22);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 28px; }
+    .hero p { margin: 0; color: rgba(255,255,255,0.9); line-height: 1.6; }
+    .top-nav {
+      margin: 12px 0 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .top-nav a {
+      text-decoration: none;
+      border: 1px solid #cfe0d7;
+      background: #eff7f3;
+      color: #1d6b52;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .panel > header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f7fbf8;
+      font-weight: 800;
+    }
+    .panel-body { padding: 16px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 14px;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 14px;
+    }
+    .muted { color: var(--muted); }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    input {
+      width: 100%;
+      margin-top: 6px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary { background: var(--brand); color: #fff; }
+    .secondary { background: var(--brand-soft); color: var(--brand); }
+    .ghost {
+      background: #fff;
+      color: var(--brand);
+      border: 1px solid #cfe0d7;
+    }
+    .status {
+      border: 1px solid var(--line);
+      background: #fbfdfc;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .status.ok { border-color: #bfe5cd; background: #f4fcf7; color: var(--ok); }
+    .status.bad { border-color: #efc5c5; background: #fff6f6; color: var(--bad); }
+    .status.warn { border-color: #edd8b5; background: #fffaf1; color: var(--warn); }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .metric-card {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff, #f3f8f5);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .metric-card .k {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+    .metric-card .v {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--brand);
+      word-break: break-word;
+    }
+    .workflow-rail {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .stage-node {
+      border: 1px solid var(--line);
+      background: #fbfdff;
+      border-radius: 14px;
+      padding: 12px 10px;
+      min-height: 112px;
+    }
+    .stage-node .num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e7f1ec;
+      color: #4b6b60;
+      font-weight: 800;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .stage-node .name {
+      font-weight: 800;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .stage-node .desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .stage-node.done {
+      border-color: #bee4cc;
+      background: #f4fcf7;
+    }
+    .stage-node.done .num {
+      background: #1f8e56;
+      color: #fff;
+    }
+    .stage-node.active {
+      border-color: #c9e0d5;
+      background: #edf6f1;
+      box-shadow: inset 0 0 0 1px #deeee5;
+    }
+    .stage-node.active .num {
+      background: var(--brand);
+      color: #fff;
+    }
+    .stream {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      max-height: 420px;
+      overflow: auto;
+      padding: 10px;
+    }
+    .event {
+      border: 1px solid #e3ece7;
+      background: #fcfefd;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .event .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .event .data {
+      margin-top: 8px;
+      color: #355247;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .workflow-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .stage-card, .result-card, .artifact-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+    }
+    .stage-card h4, .result-card h4, .artifact-card h4 {
+      margin: 0 0 8px;
+      color: var(--brand);
+      font-size: 16px;
+    }
+    .stage-card p, .artifact-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      border: 1px solid #d9e7df;
+      background: #f3f8f5;
+      color: var(--brand);
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .result-card .hero-summary {
+      border: 1px solid #dce9e2;
+      background: #f4f9f6;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      line-height: 1.65;
+    }
+    .result-card .section-title {
+      margin: 14px 0 8px;
+      font-weight: 800;
+      color: var(--ink);
+      font-size: 14px;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 6px 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 8px 0;
+    }
+    .kv .k { color: var(--muted); font-weight: 700; }
+    .kv .v { word-break: break-word; }
+    .evidence-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #355247;
+      line-height: 1.7;
+      font-size: 13px;
+    }
+    .artifact-toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .artifact-detail {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fbfdfc;
+      padding: 12px;
+      min-height: 120px;
+    }
+    .product-view {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .reasoning-section {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .reasoning-section > header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #f7fbf8;
+      border-bottom: 1px solid var(--line);
+      align-items: baseline;
+    }
+    .reasoning-section h3 {
+      margin: 0;
+      font-size: 16px;
+      color: var(--ink);
+    }
+    .reasoning-section .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .reasoning-section .body {
+      padding: 14px;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .evidence-columns {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .info-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 11px 12px;
+    }
+    .info-card h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: var(--ink);
+    }
+    .compact-text {
+      font-size: 13px;
+      color: #355247;
+      line-height: 1.7;
+    }
+    .candidate-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .candidate-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .candidate-title {
+      font-weight: 800;
+      color: var(--ink);
+      font-size: 15px;
+    }
+    .candidate-reason {
+      color: #355247;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #eef4f1;
+      color: var(--muted);
+      font-size: 12px;
+      margin-right: 4px;
+      margin-top: 4px;
+    }
+    .badge.ok { color: var(--ok); border-color: #cbe8d7; background: #f1fbf5; }
+    .badge.warn { color: var(--warn); border-color: #ead8bb; background: #fffaf0; }
+    .badge.bad { color: var(--bad); border-color: #f0cbcb; background: #fff5f5; }
+    .diagnosis-fact-grid {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr);
+      gap: 6px 10px;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+    .diagnosis-fact-grid .label {
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .diagnosis-fact-grid .value {
+      color: #355247;
+      word-break: break-word;
+    }
+    .diagnosis-card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .trace-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: #fff;
+    }
+    .trace-table th, .trace-table td {
+      border-bottom: 1px solid #e8efea;
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      color: #355247;
+    }
+    .trace-table th {
+      color: var(--muted);
+      font-weight: 700;
+      background: #f8fbf9;
+    }
+    .audit-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .audit-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+    }
+    .audit-card h4 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: var(--ink);
+    }
+    .evidence-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdfc;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .evidence-item .title {
+      font-weight: 800;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .meta-line {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      color: #27465e;
+    }
+    @media (max-width: 1120px) {
+      .grid, .two-col, .summary-grid, .workflow-summary, .card-grid, .evidence-columns, .diagnosis-card-grid {
+        grid-template-columns: 1fr;
+      }
+      .workflow-rail {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 720px) {
+      .workflow-rail {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>yk-FERTA 任务结果页（演示版）</h1>
+      <p>目标：不仅展示最终诊断卡，还要把工作流阶段、证据生成和复核路径可视化，符合 yk-FERTA 的“可追踪临床推理系统”定位。</p>
+    </section>
+
+    <div class="top-nav">
+      <a href="/demo">演示入口</a>
+      <a href="/debug/case-workbench">病例工作台</a>
+      <a href="/debug/task-viewer">任务结果页</a>
+      <a href="/debug/task-console">研发控制台（保留）</a>
+    </div>
+
+    <section class="panel">
+      <header>任务连接</header>
+      <div class="panel-body grid">
+        <div>
+          <label>
+            API Base URL
+            <input id="baseUrl" value="" placeholder="默认使用当前站点">
+          </label>
+          <label>
+            Task ID
+            <input id="taskId" placeholder="task_xxx">
+          </label>
+          <div class="actions">
+            <button id="connectBtn" class="primary">连接 SSE</button>
+            <button id="loadBtn" class="secondary">加载结果</button>
+            <button id="artifactBtn" class="secondary">查看 Artifacts</button>
+          </div>
+          <div id="connStatus" class="status muted">未连接。</div>
+        </div>
+        <div>
+          <div class="summary-grid">
+            <div class="metric-card">
+              <div class="k">任务状态</div>
+              <div id="metricTaskStatus" class="v">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="k">当前阶段</div>
+              <div id="metricTaskStage" class="v">-</div>
+            </div>
+            <div class="metric-card">
+              <div class="k">当前进度</div>
+              <div id="metricTaskProgress" class="v">0%</div>
+            </div>
+            <div class="metric-card">
+              <div class="k">Artifacts</div>
+              <div id="metricArtifacts" class="v">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>工作流可视化</header>
+      <div class="panel-body">
+        <div id="workflowRail" class="workflow-rail"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>阶段回放</header>
+      <div class="panel-body two-col">
+        <div>
+          <div class="muted" style="font-weight:800; margin-bottom:8px;">事件流</div>
+          <div id="eventStream" class="stream"></div>
+        </div>
+        <div>
+          <div class="muted" style="font-weight:800; margin-bottom:8px;">阶段摘要</div>
+          <div id="workflowSummary" class="workflow-summary">
+            <div class="stage-card"><h4>工作流摘要</h4><p>任务完成后会显示 HPO、证据检索、相似病例、初步诊断、复核与最终综合等阶段概览。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>最终结果（result）</header>
+      <div class="panel-body">
+        <div id="resultSummary" class="status muted">尚未加载结果。</div>
+        <div id="diagnosisCards"></div>
+        <div id="traceabilityPanel"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>Artifacts</header>
+      <div class="panel-body">
+        <div id="artifactStatus" class="status muted">尚未加载。</div>
+        <div id="artifactList"></div>
+        <div id="artifactDetail" class="artifact-detail">
+          <div class="muted">点击上方 artifact 类型后显示详情。</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let eventSource = null;
+    let streamCompleted = false;
+    let streamTaskId = "";
+    let lastArtifacts = [];
+    let lastResult = null;
+
+    const $ = (id) => document.getElementById(id);
+    const stageDefs = [
+      { key: "case_ingestion", name: "病例接入", desc: "建立任务并锁定输入", min: 1, max: 4 },
+      { key: "phenotype_extraction", name: "表型提取", desc: "抽取或接收确认 HPO", min: 5, max: 19 },
+      { key: "phenotype_analysis", name: "表型分析", desc: "表型工具生成候选线索", min: 20, max: 29 },
+      { key: "parallel_diagnosis", name: "并行检索", desc: "知识证据与相似病例召回", min: 30, max: 54 },
+      { key: "comprehensive_analysis", name: "初诊综合", desc: "生成第一轮候选诊断", min: 55, max: 64 },
+      { key: "disease_normalization", name: "疾病标准化", desc: "候选病映射到标准实体", min: 65, max: 74 },
+      { key: "per_disease_verification", name: "逐病复核", desc: "检查支持、反证和缺失证据", min: 75, max: 89 },
+      { key: "final_synthesis", name: "最终综合", desc: "输出结构化诊断卡与建议", min: 90, max: 100 }
+    ];
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function apiBase() {
+      const val = $("baseUrl").value.trim();
+      return val || window.location.origin;
+    }
+
+    function taskId() {
+      return $("taskId").value.trim();
+    }
+
+    function setStatus(id, text, tone = "") {
+      const el = $(id);
+      el.className = `status ${tone}`.trim();
+      el.textContent = text;
+    }
+
+    function stageText(stage) {
+      const labels = {
+        queued: "任务排队",
+        case_ingestion: "病例接入",
+        phenotype_extraction: "表型提取",
+        phenotype_analysis: "表型分析",
+        parallel_diagnosis: "并行检索",
+        parallel_running: "并行检索",
+        parallel_complete: "并行检索完成",
+        comprehensive_analysis: "初诊综合",
+        disease_matching: "疾病标准化",
+        disease_normalization: "疾病标准化",
+        disease_verification: "逐病复核",
+        per_disease_verification: "逐病复核",
+        final_synthesis: "最终综合",
+        completed: "任务完成",
+        task_all_done: "任务完成",
+        failed: "任务失败",
+        cancelled: "任务取消"
+      };
+      return labels[stage] || stage || "-";
+    }
+
+    function toneForSupport(level) {
+      if (level === "高") return "ok";
+      if (level === "低") return "bad";
+      return "warn";
+    }
+
+    function compactList(items) {
+      return Array.isArray(items) && items.length ? items.join("；") : "-";
+    }
+
+    function badge(text, tone = "") {
+      return `<span class="badge ${tone}">${escapeHtml(text)}</span>`;
+    }
+
+    function linkOrText(text, url) {
+      const safeText = escapeHtml(text || "-");
+      if (!url) return safeText;
+      return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${safeText}</a>`;
+    }
+
+    function publicCaseReference(item) {
+      const metadata = item?.metadata || {};
+      const pmid = metadata.source_pmid || "";
+      const url = metadata.source_url || "";
+      const title = metadata.source_title || "";
+      const parts = [];
+      if (pmid) {
+        parts.push(`PMID：${linkOrText(pmid, url)}`);
+      }
+      if (title) {
+        parts.push(`文献标题：${escapeHtml(title)}`);
+      }
+      return parts.join("<br>");
+    }
+
+    function sourceLabel(type) {
+      const labels = {
+        web_search: "网页检索",
+        pubmed: "PubMed",
+        arxiv: "arXiv",
+        wikipedia: "Wikipedia",
+        omim: "OMIM",
+        orphanet: "Orphanet",
+        guideline: "指南/共识",
+        phenotype_tool: "表型工具",
+        case_bank: "病例库",
+      };
+      return labels[type] || type || "-";
+    }
+
+    function reviewTone(review) {
+      if (!review) return "warn";
+      if (!review.is_supported) return "bad";
+      const confidence = Number(review.confidence || 0);
+      if (confidence >= 0.8) return "ok";
+      if (confidence >= 0.5) return "warn";
+      return "bad";
+    }
+
+    function normalizeKey(value) {
+      return String(value || "").toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ").trim();
+    }
+
+    function findReviewForCandidate(candidate, normalizedCandidates, reviews) {
+      const candidateName = candidate.name || candidate.normalized_name || "";
+      const direct = reviews.find((item) => normalizeKey(item.candidate_name) === normalizeKey(candidateName));
+      if (direct) return direct;
+      const normalized = normalizedCandidates.find(
+        (item) => normalizeKey(item.original_name) === normalizeKey(candidateName)
+          || normalizeKey(item.normalized_name) === normalizeKey(candidateName)
+      );
+      if (!normalized) return null;
+      return reviews.find((item) => normalizeKey(item.candidate_name) === normalizeKey(normalized.normalized_name))
+        || reviews.find((item) => normalizeKey(item.candidate_name) === normalizeKey(normalized.original_name))
+        || null;
+    }
+
+    function summarizeEventData(data) {
+      if (!data || typeof data !== "object" || !Object.keys(data).length) return "";
+      const parts = [];
+      if (data.count !== undefined) parts.push(`数量 ${data.count}`);
+      if (data.candidate_count !== undefined) parts.push(`候选 ${data.candidate_count}`);
+      if (data.knowledge_evidence_count !== undefined) parts.push(`证据 ${data.knowledge_evidence_count}`);
+      if (data.similar_case_count !== undefined) parts.push(`相似病例 ${data.similar_case_count}`);
+      if (data.mode) parts.push(`模式 ${data.mode}`);
+      if (Array.isArray(data.artifact_types) && data.artifact_types.length) {
+        parts.push(`artifacts ${data.artifact_types.join(", ")}`);
+      }
+      if (Array.isArray(data.tools) && data.tools.length) {
+        parts.push(`工具 ${data.tools.map((item) => `${item.source}:${item.status}`).join(" / ")}`);
+      }
+      if (data.error) parts.push(`错误 ${data.error}`);
+      if (data.failure_type) parts.push(`失败类型 ${data.failure_type}`);
+      if (data.timing?.total_duration_ms !== undefined) {
+        parts.push(`总耗时 ${data.timing.total_duration_ms} ms`);
+      }
+      if (!parts.length) {
+        return JSON.stringify(data, null, 2);
+      }
+      return parts.join(" · ");
+    }
+
+    function scoreText(value, digits = 3) {
+      if (value === null || value === undefined || value === "") return "-";
+      const num = Number(value);
+      return Number.isFinite(num) ? num.toFixed(digits) : escapeHtml(String(value));
+    }
+
+    function scorePercent(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return "-";
+      if (num <= 1 && num >= 0) return `${Math.round(num * 100)}%`;
+      return `${Math.round(num)}%`;
+    }
+
+    function relevanceTone(score) {
+      const num = Number(score);
+      if (!Number.isFinite(num)) return "warn";
+      if (num >= 0.75) return "ok";
+      if (num >= 0.45) return "warn";
+      return "bad";
+    }
+
+    function relevanceLabel(score) {
+      const num = Number(score);
+      if (!Number.isFinite(num)) return "相关性待定";
+      if (num >= 0.75) return "高相关";
+      if (num >= 0.45) return "中等相关";
+      return "低度相关";
+    }
+
+    function deriveClinicalValue(item) {
+      const source = sourceLabel(item?.source_type);
+      const summary = String(item?.summary || "");
+      if (item?.source_type === "pubmed") {
+        return summary ? "提供文献级支持，可用于核对候选病与病例特征是否一致。" : "提供 PubMed 线索。";
+      }
+      if (item?.source_type === "omim" || item?.source_type === "orphanet") {
+        return `${source} 疾病知识，可用于核对疾病定义、遗传方式与分子机制。`;
+      }
+      if (summary.includes("检测") || summary.includes("筛查")) {
+        return "可辅助判断后续检查方向。";
+      }
+      return "提供补充背景信息，需与病例表型和复核结果联合解释。";
+    }
+
+    function renderList(items) {
+      if (!Array.isArray(items) || !items.length) return "<li>-</li>";
+      return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    }
+
+    function renderTable(headers, rows) {
+      return `
+        <div style="overflow:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr>${headers.map((header) => `<th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">${escapeHtml(header)}</th>`).join("")}</tr>
+            </thead>
+            <tbody>${rows || `<tr><td colspan="${headers.length}" style="padding:10px; color:var(--muted);">-</td></tr>`}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderArtifactData(type, data) {
+      if (!data || typeof data !== "object") {
+        return `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+      }
+
+      if (type === "hpo") {
+        const rows = (data.phenotypes || []).map((item) => `
+          <tr>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.label || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.code || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.source || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${scoreText(item.confidence)}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.notes || "-")}</td>
+          </tr>
+        `).join("");
+        return renderTable(["表型", "HPO", "来源", "置信度", "备注"], rows);
+      }
+
+      if (type === "phenotype_tools" || type === "phenotype_hints") {
+        const toolRuns = data.tool_runs || [];
+        const toolCards = toolRuns.map((item) => `
+          <div class="artifact-card" style="margin-bottom:10px;">
+            <h4>${escapeHtml(item.source || "-")}</h4>
+            <p>状态：${escapeHtml(item.status || "-")} · 候选 ${(item.parsed_candidates || []).length} 个 · 耗时 ${escapeHtml(item.elapsed_ms ?? "-")} ms</p>
+            <div class="kv">
+              <div class="k">输入</div><div class="v">${escapeHtml((item.query || []).join(" / ") || "-")}</div>
+              <div class="k">Top 候选</div><div class="v">${escapeHtml((item.parsed_candidates || []).slice(0, 5).map((candidate) => candidate.disease_name).join(" / ") || "-")}</div>
+              <div class="k">错误</div><div class="v">${escapeHtml(item.error || "-")}</div>
+            </div>
+          </div>
+        `).join("");
+        return toolCards || "<div class='muted'>暂无表型工具运行详情。</div>";
+      }
+
+      if (type === "evidence" || type === "candidate_evidence") {
+        const items = data.knowledge_evidence || data.candidate_evidence || [];
+        return items.length ? items.map((item) => `
+          <div class="artifact-card" style="margin-bottom:10px;">
+            <h4>${escapeHtml(item.title || item.source_id || "-")}</h4>
+            <p>来源：${escapeHtml(item.source_type || "-")} ${item.url ? `· <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">查看来源</a>` : ""}</p>
+            <div class="kv">
+              <div class="k">来源 ID</div><div class="v">${escapeHtml(item.source_id || "-")}</div>
+              <div class="k">角色</div><div class="v">${escapeHtml(item.evidence_role || "-")}</div>
+            </div>
+            <div style="font-size:13px; line-height:1.7; color:#27465e;">${escapeHtml(item.summary || "-")}</div>
+          </div>
+        `).join("") : "<div class='muted'>暂无证据详情。</div>";
+      }
+
+      if (type === "similar_cases") {
+        const rows = (data.similar_cases || []).map((item) => `
+          <tr>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.case_id || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.diagnosis || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.evidence_role || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${scoreText(item.score, 4)}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml((item.summary || "").slice(0, 160) || "-")}</td>
+          </tr>
+        `).join("");
+        return renderTable(["Case ID", "诊断/标签", "证据角色", "分数", "摘要"], rows);
+      }
+
+      if (type === "preliminary_diagnosis" || type === "normalized_candidates") {
+        const items = data.initial_candidates || data.normalized_candidates || [];
+        const rows = items.map((item) => `
+          <tr>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.rank ?? "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.name || item.original_name || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.normalized_name || item.disease_id || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${scoreText(item.score, 2)}</td>
+          </tr>
+        `).join("");
+        return renderTable(["排序", "原始候选", "标准化/ID", "分数"], rows);
+      }
+
+      if (type === "reviews") {
+        const items = data.reviews || [];
+        return items.length ? items.map((item) => `
+          <div class="artifact-card" style="margin-bottom:10px;">
+            <h4>${escapeHtml(item.candidate_name || "-")}</h4>
+            <p>结论：${item.is_supported ? "支持" : "不支持"} · 置信度 ${escapeHtml(item.confidence ?? "-")}</p>
+            <div style="font-size:13px; line-height:1.7; color:#27465e; margin-top:8px;">${escapeHtml(item.reasoning || "-")}</div>
+            <div class="section-title">支持证据</div>
+            <ul class="evidence-list">${renderList(item.supporting_evidence || [])}</ul>
+            <div class="section-title">反对证据</div>
+            <ul class="evidence-list">${renderList(item.contradicting_evidence || [])}</ul>
+            <div class="section-title">缺失证据</div>
+            <ul class="evidence-list">${renderList(item.missing_evidence || [])}</ul>
+          </div>
+        `).join("") : "<div class='muted'>暂无复核结果。</div>";
+      }
+
+      if (type === "final_report" || type === "result") {
+        const finalRec = data.final_recommendation || data.response?.final_recommendation || {};
+        const cards = finalRec.diagnosis_cards || [];
+        return `
+          <div class="artifact-card" style="margin-bottom:10px;">
+            <h4>最终摘要</h4>
+            <p>${escapeHtml(finalRec.summary || "-")}</p>
+          </div>
+          ${cards.map((card, index) => `
+            <div class="artifact-card" style="margin-bottom:10px;">
+              <h4>#${index + 1} ${escapeHtml(card.disease_name_zh || card.clinical_diagnosis || "-")}</h4>
+              <div class="kv">
+                <div class="k">支持度</div><div class="v">${escapeHtml(card.support_level || "-")}</div>
+                <div class="k">置信度</div><div class="v">${escapeHtml(card.confidence ?? "-")}</div>
+                <div class="k">基因</div><div class="v">${escapeHtml(compactList(card.disease_genes))}</div>
+                <div class="k">建议检查</div><div class="v">${escapeHtml(compactList(card.recommended_tests))}</div>
+              </div>
+            </div>
+          `).join("")}
+        `;
+      }
+
+      return `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+    }
+
+    function renderWorkflowRail(progress = 0, currentStep = "") {
+      const activeByStep = String(currentStep || "");
+      $("workflowRail").innerHTML = stageDefs.map((stage, index) => {
+        let status = "";
+        if (activeByStep && (activeByStep === stage.key || (stage.key === "parallel_diagnosis" && activeByStep.startsWith("parallel_")) || (stage.key === "disease_normalization" && activeByStep === "disease_matching") || (stage.key === "per_disease_verification" && activeByStep === "disease_verification"))) {
+          status = "active";
+        } else if (progress >= stage.max) {
+          status = "done";
+        } else if (progress >= stage.min && progress < stage.max) {
+          status = "active";
+        }
+        return `
+          <div class="stage-node ${status}">
+            <div class="num">${index + 1}</div>
+            <div class="name">${escapeHtml(stage.name)}</div>
+            <div class="desc">${escapeHtml(stage.desc)}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function updateMetrics(statusTextValue, stageValue, progressValue, artifactCount) {
+      $("metricTaskStatus").textContent = statusTextValue || "-";
+      $("metricTaskStage").textContent = stageText(stageValue || "-");
+      $("metricTaskProgress").textContent = `${progressValue ?? 0}%`;
+      $("metricArtifacts").textContent = String(artifactCount ?? 0);
+    }
+
+    function appendEvent(payload) {
+      const box = $("eventStream");
+      const row = document.createElement("div");
+      row.className = "event";
+      row.innerHTML = `
+        <div class="head">
+          <span>step=${escapeHtml(payload.step || "-")} · progress=${escapeHtml(payload.progress)}</span>
+          <span>stage=${escapeHtml(payload.task_stage)} · seq=${escapeHtml(payload.seq_in_stage)}</span>
+        </div>
+        <div><strong>${escapeHtml(payload.message || "-")}</strong></div>
+        ${payload.data && Object.keys(payload.data).length ? `<div class="data">${escapeHtml(summarizeEventData(payload.data))}</div>` : ""}
+      `;
+      box.prepend(row);
+      renderWorkflowRail(Number(payload.progress || 0), payload.step || "");
+      updateMetrics(
+        payload.step === "task_all_done" ? "任务完成" : "运行中",
+        payload.step || "",
+        Number(payload.progress || 0),
+        lastArtifacts.length
+      );
+    }
+
+    function renderWorkflowSummary(response, timing) {
+      const phenotypes = response?.phenotypes || [];
+      const toolRuns = response?.phenotype_tool_runs || [];
+      const evidence = response?.knowledge_evidence || [];
+      const similarCases = response?.similar_cases || [];
+      const initialCandidates = response?.initial_candidates || [];
+      const normalizedCandidates = response?.normalized_candidates || [];
+      const reviews = response?.reviews || [];
+      const finalRecommendation = response?.final_recommendation || {};
+      const diagnosisCards = finalRecommendation.diagnosis_cards || [];
+
+      $("workflowSummary").innerHTML = `
+        <div class="stage-card">
+          <h4>1. HPO 表型确认</h4>
+          <p>已确认 ${phenotypes.length} 个表型。${phenotypes.slice(0, 5).map((item) => item.label).join(" / ") || "尚无返回"}</p>
+          <div class="chips">${phenotypes.slice(0, 6).map((item) => `<span class="tag">${escapeHtml(item.code || item.label || "-")}</span>`).join("")}</div>
+        </div>
+        <div class="stage-card">
+          <h4>2. 表型工具分析</h4>
+          <p>运行 ${toolRuns.length} 个工具。成功 ${toolRuns.filter((item) => item.status === "success").length} 个，失败 ${toolRuns.filter((item) => item.status === "failed").length} 个。</p>
+          <div class="chips">${toolRuns.map((item) => `<span class="tag">${escapeHtml(item.source || "-")} ${escapeHtml(item.status || "-")}</span>`).join("") || "<span class='tag'>暂无</span>"}</div>
+        </div>
+        <div class="stage-card">
+          <h4>3. 证据与病例检索</h4>
+          <p>知识证据 ${evidence.length} 条，相似病例 ${similarCases.length} 条。公共病例与私有检测参考在结果解释中分开使用。</p>
+          <div class="chips">
+            <span class="tag">evidence ${evidence.length}</span>
+            <span class="tag">similar_cases ${similarCases.length}</span>
+          </div>
+        </div>
+        <div class="stage-card">
+          <h4>4. 初步诊断与标准化</h4>
+          <p>初步候选 ${initialCandidates.length} 个，标准化疾病实体 ${normalizedCandidates.length} 个。</p>
+          <div class="chips">${initialCandidates.slice(0, 5).map((item) => `<span class="tag">${escapeHtml(item.name || "-")}</span>`).join("") || "<span class='tag'>暂无</span>"}</div>
+        </div>
+        <div class="stage-card">
+          <h4>5. 逐病复核</h4>
+          <p>共复核 ${reviews.length} 个候选，其中支持 ${reviews.filter((item) => item.is_supported).length} 个。该阶段用于区分支持、反证和缺失证据。</p>
+          <div class="chips">${reviews.slice(0, 5).map((item) => `<span class="tag">${escapeHtml(item.candidate_name || "-")} ${item.is_supported ? "支持" : "不支持"}</span>`).join("") || "<span class='tag'>暂无</span>"}</div>
+        </div>
+        <div class="stage-card">
+          <h4>6. 最终综合</h4>
+          <p>输出 ${diagnosisCards.length} 张诊断卡。总耗时 ${timing?.total_duration_ms ?? "-"} ms。当前页面展示的是医生可审阅结果，而不是单次黑箱文本。</p>
+          <div class="chips">${diagnosisCards.slice(0, 4).map((item) => `<span class="tag">${escapeHtml(item.disease_name_zh || item.clinical_diagnosis || "-")}</span>`).join("") || "<span class='tag'>暂无</span>"}</div>
+        </div>
+      `;
+    }
+
+    function renderProductWorkflow(response, result) {
+      const phenotypes = response.phenotypes || [];
+      const toolRuns = response.phenotype_tool_runs || [];
+      const evidence = response.knowledge_evidence || [];
+      const similarCases = response.similar_cases || [];
+      const initialCandidates = response.initial_candidates || [];
+      const normalizedCandidates = response.normalized_candidates || [];
+      const reviews = response.reviews || [];
+      const finalRecommendation = response.final_recommendation || {};
+      const diagnosisCards = finalRecommendation.diagnosis_cards || [];
+      const timing = result.timing || {};
+      const supportedReviews = reviews.filter((item) => item.is_supported);
+      const publicCases = similarCases.filter((item) => item.evidence_role === "diagnosis_reference");
+      const privateCases = similarCases.filter((item) => item.evidence_role === "testing_finding_reference");
+      const topCandidate = initialCandidates
+        .map((candidate) => ({ candidate, review: findReviewForCandidate(candidate, normalizedCandidates, reviews) }))
+        .sort((left, right) => {
+          const leftReview = left.review || {};
+          const rightReview = right.review || {};
+          return (
+            Number(Boolean(rightReview.is_supported)) - Number(Boolean(leftReview.is_supported))
+            || Number(rightReview.confidence || 0) - Number(leftReview.confidence || 0)
+            || Number(right.candidate.score || 0) - Number(left.candidate.score || 0)
+          );
+        })[0]?.candidate || initialCandidates[0] || null;
+
+      const topDiagnosisCard = diagnosisCards[0] || null;
+      const clinicalDiagnosis = topDiagnosisCard
+        ? (topDiagnosisCard.disease_name_zh || topDiagnosisCard.clinical_diagnosis || "-")
+        : (topCandidate?.name || normalizedCandidates[0]?.normalized_name || "-");
+      const diseaseGenes = compactList(topDiagnosisCard?.disease_genes || []);
+
+      const topPhenotypes = phenotypes.map((item) => `${item.label || "-"}${item.code ? ` (${item.code})` : ""}`).join("、");
+      const toolSummary = toolRuns.map((item) => `${item.source}:${item.status}`).join(" / ");
+
+      const evidenceRows = evidence.slice(0, 8).map((item) => `
+        <tr>
+          <td style="padding:10px; border-bottom:1px solid #eef3f8;">
+            <strong>${escapeHtml(sourceLabel(item.source_type))}</strong><br>
+            <span class="muted">${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">查看来源</a>` : escapeHtml(item.source_id || "-")}</span>
+          </td>
+          <td style="padding:10px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.summary || item.title || "-")}</td>
+          <td style="padding:10px; border-bottom:1px solid #eef3f8;">${badge(relevanceLabel(item.relevance_score), relevanceTone(item.relevance_score))}</td>
+          <td style="padding:10px; border-bottom:1px solid #eef3f8;">${escapeHtml(deriveClinicalValue(item))}</td>
+        </tr>
+      `).join("");
+
+      const caseGroupCard = (title, items, tone, note = "") => `
+        <div class="info-card">
+          <h4>${escapeHtml(title)} ${badge(`${items.length} 条`, tone)}</h4>
+          ${(items || []).slice(0, 4).map((item) => `
+            <div class="compact-text" style="margin-bottom:10px;">
+              <strong>${escapeHtml(item.diagnosis || item.case_id || "-")}</strong><br>
+              分数 ${scoreText(item.score, 4)} · ${escapeHtml(item.case_id || "-")}<br>
+              ${item.evidence_role === "diagnosis_reference" ? `${publicCaseReference(item)}<br>` : ""}
+              ${escapeHtml((item.summary || "").slice(0, 190) || "-")}
+            </div>
+          `).join("") || "<div class='muted'>暂无。</div>"}
+          ${note ? `<div class="muted">${note}</div>` : ""}
+        </div>
+      `;
+
+      const candidateRows = initialCandidates.slice(0, 5).map((candidate) => {
+        const review = findReviewForCandidate(candidate, normalizedCandidates, reviews);
+        const tone = reviewTone(review);
+        return `
+          <tr>
+            <td style="padding:10px; border-bottom:1px solid #eef3f8;"><strong>${escapeHtml(candidate.name || "-")}</strong></td>
+            <td style="padding:10px; border-bottom:1px solid #eef3f8;">${badge(scorePercent(review?.confidence ?? candidate.score), tone)}</td>
+            <td style="padding:10px; border-bottom:1px solid #eef3f8;"><ul class="evidence-list">${renderList((review?.supporting_evidence || []).slice(0, 3))}</ul></td>
+            <td style="padding:10px; border-bottom:1px solid #eef3f8;"><ul class="evidence-list">${renderList((review?.contradicting_evidence || []).slice(0, 3))}</ul></td>
+          </tr>
+        `;
+      }).join("");
+
+      const reviewCards = reviews.map((review) => `
+        <div class="candidate-card">
+          <div class="candidate-head">
+            <div class="candidate-title">${escapeHtml(review.candidate_name || "-")}</div>
+            <div>${badge(review.is_supported ? "支持" : "不支持", reviewTone(review))} ${badge(`置信度 ${review.confidence ?? "-"}`)}</div>
+          </div>
+          <div class="candidate-reason">${escapeHtml(review.reasoning || "-")}</div>
+          <div class="muted" style="margin-top:8px;">证据：${escapeHtml((review.evidence_ids || []).join(", ") || "-")}</div>
+        </div>
+      `).join("");
+
+      const finalDiagnosisCards = diagnosisCards.map((card, index) => {
+        const displayName = card.disease_name_zh || card.clinical_diagnosis || "-";
+        const englishName = card.disease_name_en && card.disease_name_en !== displayName ? card.disease_name_en : "";
+        return `
+          <div class="candidate-card">
+            <div class="candidate-head">
+              <div>
+                <div class="candidate-title">#${index + 1} ${escapeHtml(displayName)}</div>
+                ${englishName ? `<div class="muted">英文名：${escapeHtml(englishName)}</div>` : ""}
+              </div>
+              <div>${badge(`支持度 ${card.support_level || "-"}`, card.support_level === "高" ? "ok" : card.support_level === "低" ? "bad" : "warn")} ${badge(`置信度 ${card.confidence ?? "-"}`)}</div>
+            </div>
+            <div class="diagnosis-fact-grid">
+              <div class="label">OMIM</div><div class="value">${linkOrText(card.omim_id || "NA", card.omim_url)}</div>
+              <div class="label">Orphanet</div><div class="value">${linkOrText(card.orphanet_id || "NA", card.orphanet_url)}</div>
+              <div class="label">遗传方式</div><div class="value">${escapeHtml(card.inheritance || "NA")}</div>
+              <div class="label">致病基因/区域</div><div class="value">${escapeHtml(compactList(card.disease_genes))}</div>
+              <div class="label">推荐检查</div><div class="value">${escapeHtml(compactList(card.recommended_tests))}</div>
+              <div class="label">分子/遗传机制</div><div class="value">${escapeHtml(card.molecular_mechanism || card.pathogenesis || "-")}</div>
+            </div>
+            <div class="candidate-reason" style="margin-bottom:10px;"><strong>推荐理由：</strong>${escapeHtml((card.supporting_evidence || []).slice(0, 3).join("；") || "基于当前病例表型、资料检索与逐病复核综合判断。")}</div>
+            <div class="diagnosis-card-grid">
+              <div><strong>支持证据</strong><ul class="evidence-list">${renderList(card.supporting_evidence || [])}</ul></div>
+              <div><strong>反对证据</strong><ul class="evidence-list">${renderList(card.contradicting_evidence || [])}</ul></div>
+              <div><strong>缺失证据</strong><ul class="evidence-list">${renderList(card.missing_evidence || [])}</ul></div>
+              <div><strong>多学科建议</strong><ul class="evidence-list">${renderList(card.specialties || [])}</ul></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="product-view">
+          <div class="result-card">
+            <div class="hero-summary">
+              <h3 style="margin:0 0 8px;">最终诊断摘要</h3>
+              <div class="compact-text">${escapeHtml(finalRecommendation.summary || "任务完成后显示最终摘要。")}</div>
+              <div class="chips">
+                <span class="tag">临床诊断 ${escapeHtml(clinicalDiagnosis)}</span>
+                <span class="tag">致病基因/区域 ${escapeHtml(diseaseGenes)}</span>
+                <span class="tag">复核支持 ${supportedReviews.length} / ${reviews.length}</span>
+              </div>
+            </div>
+          </div>
+          <section class="reasoning-section">
+            <header><h3>1. 输入表型概览</h3><span class="hint">${phenotypes.length} 个确认表型</span></header>
+            <div class="body">
+              <div class="info-card">
+                <h4>已确认 HPO / 表型</h4>
+                <div class="compact-text">${escapeHtml(topPhenotypes || "-")}</div>
+                <div class="muted" style="margin-top:8px;">表型工具状态：${escapeHtml(toolSummary || "暂无")}</div>
+              </div>
+            </div>
+          </section>
+          <section class="reasoning-section">
+            <header><h3>2. 资料检索</h3><span class="hint">医学文献与病例库证据</span></header>
+            <div class="body">
+              <div class="info-card" style="margin-bottom:12px;">
+                <h4>医学文献检索结果</h4>
+                ${renderTable(["资料来源", "主要发现", "相关性", "临床价值"], evidenceRows)}
+              </div>
+              <div class="card-grid">
+                ${caseGroupCard("公共病例库检索", publicCases, "ok")}
+                ${caseGroupCard("私有历史检测参考", privateCases, "warn", "私有历史检测案例只支持表型/检测经验参考，不等于确诊支持证据。")}
+              </div>
+            </div>
+          </section>
+          <section class="reasoning-section">
+            <header><h3>3. 五种可能诊断及支持度</h3><span class="hint">${initialCandidates.length} 个候选</span></header>
+            <div class="body">
+              <div class="info-card">
+                ${renderTable(["可能诊断", "支持度", "支持证据", "反对证据"], candidateRows)}
+              </div>
+            </div>
+          </section>
+          <section class="reasoning-section">
+            <header><h3>4. 反思判断</h3><span class="hint">逐候选复核</span></header>
+            <div class="body">${reviewCards || "<div class='compact-text'>-</div>"}</div>
+          </section>
+          <section class="reasoning-section">
+            <header><h3>5. 最终诊断与建议</h3><span class="hint">${timing.total_duration_ms ?? "-"} ms</span></header>
+            <div class="body">
+              ${finalDiagnosisCards || ""}
+              <div class="info-card" style="margin-bottom:10px;">
+                <h4>下一步建议</h4>
+                <ul class="evidence-list">${renderList(finalRecommendation.next_steps || [])}</ul>
+              </div>
+              <div class="info-card">
+                <h4>风险提示 / 注意事项</h4>
+                <ul class="evidence-list">${renderList(finalRecommendation.cautions || [])}</ul>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderTraceability(response) {
+      const phenotypes = response.phenotypes || [];
+      const toolRuns = response.phenotype_tool_runs || [];
+      const evidence = response.knowledge_evidence || [];
+      const similarCases = response.similar_cases || [];
+      const initialCandidates = response.initial_candidates || [];
+      const normalizedCandidates = response.normalized_candidates || [];
+      const reviews = response.reviews || [];
+      const finalRecommendation = response.final_recommendation || {};
+      const diagnosisCards = finalRecommendation.diagnosis_cards || [];
+
+      const hpoRows = phenotypes.map((item) => `<tr><td>${escapeHtml(item.label || "-")}</td><td>${escapeHtml(item.code || "-")}</td><td>${escapeHtml(item.source || "-")}</td><td>${item.confidence !== null && item.confidence !== undefined ? Number(item.confidence).toFixed(3) : "-"}</td><td>${escapeHtml(item.notes || "-")}</td></tr>`).join("");
+      const toolRows = toolRuns.map((item) => `<tr><td>${escapeHtml(item.source || "-")}</td><td>${badge(item.status === "success" ? "成功" : item.status === "failed" ? "失败" : "跳过", item.status === "success" ? "ok" : item.status === "failed" ? "bad" : "warn")}</td><td>${escapeHtml((item.query || []).join(", ") || "-")}</td><td>${(item.parsed_candidates || []).map((candidate) => escapeHtml(candidate.disease_name)).slice(0, 5).join("<br>") || "-"}</td><td>${escapeHtml(item.error || "-")}</td></tr>`).join("");
+      const evidenceItems = evidence.slice(0, 8).map((item) => `<div class="evidence-item"><div class="title">${escapeHtml(item.title || item.source_id || "-")}</div><div class="meta-line">${escapeHtml(sourceLabel(item.source_type))} · ${escapeHtml(item.source_id || "-")} ${item.url ? `· <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">查看来源</a>` : ""}</div><div class="compact-text">${escapeHtml(item.summary || "-")}</div></div>`).join("");
+      const caseRows = similarCases.map((item) => {
+        const metadata = item.metadata || {};
+        const reference = item.evidence_role === "diagnosis_reference"
+          ? (metadata.source_pmid
+            ? `PMID：${linkOrText(metadata.source_pmid, metadata.source_url || "")}`
+            : "-")
+          : "-";
+        return `<tr><td>${badge(item.evidence_role === "diagnosis_reference" ? "公共确诊病例参考" : "私有历史检测参考", item.evidence_role === "diagnosis_reference" ? "ok" : "warn")}<br>${escapeHtml(item.source || "-")}</td><td>${escapeHtml(item.diagnosis || "-")}<br><span class="muted">${escapeHtml(item.case_id || "-")}</span><br><span class="muted">${reference}</span></td><td>${item.score !== null && item.score !== undefined ? Number(item.score).toFixed(4) : "-"}</td><td>${escapeHtml((item.phenotype_relevant_genes || item.reported_genes || []).slice(0, 6).join(", ") || "-")}</td><td>${escapeHtml((item.summary || "").slice(0, 220))}</td></tr>`;
+      }).join("");
+      const candidateRows = initialCandidates.map((item) => `<tr><td>#${item.rank ?? "-"}</td><td>${escapeHtml(item.name || "-")}</td><td>${item.score !== null && item.score !== undefined ? Number(item.score).toFixed(2) : "-"}</td><td>${escapeHtml((item.rationale || "").slice(0, 260))}</td></tr>`).join("");
+      const normalizedRows = normalizedCandidates.map((item) => `<tr><td>${escapeHtml(item.original_name || "-")}</td><td>${escapeHtml(item.normalized_name || "-")}</td><td>${escapeHtml(item.disease_id || "-")}</td><td>${escapeHtml(item.ontology || "-")}</td></tr>`).join("");
+      const reviewItems = reviews.map((item) => `<div class="evidence-item"><div class="title">${escapeHtml(item.candidate_name || "-")} ${badge(item.is_supported ? "支持" : "不支持", item.is_supported ? "ok" : "bad")} ${badge(`置信度 ${item.confidence ?? "-"}`)}</div><div class="compact-text">${escapeHtml(item.reasoning || "-")}</div></div>`).join("");
+      const diagnosisCardItems = diagnosisCards.map((item, index) => `<div class="evidence-item"><div class="title">#${index + 1} ${escapeHtml(item.disease_name_zh || item.clinical_diagnosis || "-")} ${badge(`支持度 ${item.support_level || "-"}`)}</div><div class="compact-text"><strong>建议检查：</strong>${escapeHtml((item.recommended_tests || []).join("；") || "-")}</div></div>`).join("");
+
+      $("traceabilityPanel").innerHTML = `
+        <div class="audit-grid">
+          <div class="audit-card"><h4>1. HPO 表型分析</h4><table class="trace-table"><thead><tr><th>表型</th><th>HPO</th><th>来源</th><th>置信度</th><th>备注</th></tr></thead><tbody>${hpoRows || "<tr><td colspan='5'>-</td></tr>"}</tbody></table></div>
+          <div class="audit-card"><h4>2. 表型工具检索</h4><table class="trace-table"><thead><tr><th>工具</th><th>状态</th><th>输入</th><th>候选</th><th>错误</th></tr></thead><tbody>${toolRows || "<tr><td colspan='5'>-</td></tr>"}</tbody></table></div>
+          <div class="audit-card"><h4>3. 资料检索</h4>${evidenceItems || "<div class='compact-text'>-</div>"}</div>
+          <div class="audit-card"><h4>4. 相似案例检索</h4><table class="trace-table"><thead><tr><th>角色/来源</th><th>诊断或检测标签</th><th>分数</th><th>关键词/基因</th><th>摘要</th></tr></thead><tbody>${caseRows || "<tr><td colspan='5'>-</td></tr>"}</tbody></table></div>
+          <div class="audit-card"><h4>5. 初步诊断</h4><table class="trace-table"><thead><tr><th>排序</th><th>候选</th><th>分数</th><th>理由</th></tr></thead><tbody>${candidateRows || "<tr><td colspan='4'>-</td></tr>"}</tbody></table></div>
+          <div class="audit-card"><h4>6. 疾病标准化</h4><table class="trace-table"><thead><tr><th>原始名称</th><th>标准名称</th><th>ID</th><th>体系</th></tr></thead><tbody>${normalizedRows || "<tr><td colspan='4'>-</td></tr>"}</tbody></table></div>
+          <div class="audit-card"><h4>7. 反思复审</h4>${reviewItems || "<div class='compact-text'>-</div>"}</div>
+          <div class="audit-card"><h4>8. 最终诊断建议</h4><div class="compact-text"><strong>总结：</strong>${escapeHtml(finalRecommendation.summary || "-")}</div><div style="margin:10px 0;">${diagnosisCardItems || "<div class='compact-text'>-</div>"}</div><div class="compact-text"><strong>下一步：</strong>${escapeHtml((finalRecommendation.next_steps || []).join("；") || "-")}</div><div class="compact-text"><strong>注意事项：</strong>${escapeHtml((finalRecommendation.cautions || []).join("；") || "-")}</div></div>
+        </div>
+      `;
+    }
+
+    function renderDiagnosisCards(response, timing) {
+      const container = $("diagnosisCards");
+      container.innerHTML = renderProductWorkflow(response, { timing });
+    }
+
+    function renderArtifactList(items) {
+      $("artifactList").innerHTML = items.length ? `
+        <div class="artifact-toolbar">
+          ${items.map((item) => `<button class="ghost" data-artifact-type="${escapeHtml(item.artifact_type)}">${escapeHtml(item.artifact_type)}</button>`).join("")}
+        </div>
+      ` : `<div class="muted">暂无 artifact。</div>`;
+    }
+
+    async function loadArtifactDetail(type) {
+      const id = taskId();
+      if (!id || !type) return;
+      $("artifactDetail").innerHTML = `<div class="muted">加载 ${escapeHtml(type)} ...</div>`;
+      try {
+        const res = await fetch(`${apiBase()}/api/v1/tasks/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(type)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        $("artifactDetail").innerHTML = `
+          <div class="artifact-card">
+            <h4>${escapeHtml(type)}</h4>
+            <p style="margin-bottom:10px;">version=${escapeHtml(data.version)} · created_at=${escapeHtml(data.created_at)}</p>
+            ${renderArtifactData(type, data.data)}
+          </div>
+        `;
+      } catch (err) {
+        $("artifactDetail").innerHTML = `<div class="status bad">加载 artifact 失败：${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function refreshTaskMeta() {
+      const id = taskId();
+      if (!id) return;
+      try {
+        const res = await fetch(`${apiBase()}/api/v1/tasks/${encodeURIComponent(id)}`);
+        if (!res.ok) return;
+        const task = await res.json();
+        updateMetrics(task.status || "-", task.stage || "-", task.progress ?? 0, lastArtifacts.length);
+        renderWorkflowRail(Number(task.progress || 0), task.stage || "");
+      } catch (_err) {
+      }
+    }
+
+    async function connectSse() {
+      const id = taskId();
+      if (!id) {
+        setStatus("connStatus", "请先填写 task_id。", "bad");
+        return;
+      }
+      if (eventSource) eventSource.close();
+      streamCompleted = false;
+      streamTaskId = id;
+      $("eventStream").innerHTML = "";
+      await refreshTaskMeta();
+      setStatus("connStatus", `正在连接 ${id} ...`, "warn");
+      const url = `${apiBase()}/api/v1/tasks/${encodeURIComponent(id)}/events`;
+      eventSource = new EventSource(url);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          appendEvent(payload);
+          setStatus("connStatus", `连接中：${payload.message || payload.step} (${payload.progress}%)`, "ok");
+        } catch (err) {
+          setStatus("connStatus", `事件解析失败：${err.message}`, "bad");
+        }
+      };
+      eventSource.addEventListener("done", async (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          streamCompleted = true;
+          appendEvent(payload);
+          setStatus("connStatus", `任务终态：${payload.message}。SSE 已完成。`, "ok");
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          await loadResult();
+          await loadArtifacts();
+        } catch (err) {
+          setStatus("connStatus", `done事件解析失败：${err.message}`, "bad");
+        }
+      });
+      eventSource.onerror = () => {
+        if (streamCompleted) {
+          setStatus("connStatus", `任务 ${streamTaskId || ""} 已完成，SSE 已正常结束。`, "ok");
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          return;
+        }
+        setStatus("connStatus", "SSE 连接中断（可重新连接或直接加载结果）。", "bad");
+      };
+    }
+
+    async function loadResult() {
+      const id = taskId();
+      if (!id) {
+        setStatus("resultSummary", "请先填写 task_id。", "bad");
+        return;
+      }
+      setStatus("resultSummary", "加载 result ...", "warn");
+      try {
+        const res = await fetch(`${apiBase()}/api/v1/tasks/${encodeURIComponent(id)}/result`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        lastResult = data;
+        const response = data.response || {};
+        const finalRec = response.final_recommendation || {};
+        const timing = data.timing || {};
+        setStatus(
+          "resultSummary",
+          `加载成功\n摘要：${finalRec.summary || "无"}\n总耗时：${timing.total_duration_ms ?? "-"} ms`,
+          "ok"
+        );
+        renderWorkflowSummary(response, timing);
+        renderDiagnosisCards(response, timing);
+        renderTraceability(response);
+        await refreshTaskMeta();
+      } catch (err) {
+        setStatus("resultSummary", `加载失败：${err.message}`, "bad");
+      }
+    }
+
+    async function loadArtifacts() {
+      const id = taskId();
+      if (!id) {
+        setStatus("artifactStatus", "请先填写 task_id。", "bad");
+        return;
+      }
+      setStatus("artifactStatus", "加载 artifacts ...", "warn");
+      try {
+        const res = await fetch(`${apiBase()}/api/v1/tasks/${encodeURIComponent(id)}/artifacts`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        lastArtifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
+        setStatus("artifactStatus", `加载成功：${lastArtifacts.length} 个 artifact`, "ok");
+        renderArtifactList(lastArtifacts);
+        updateMetrics($("metricTaskStatus").textContent, $("metricTaskStage").textContent, $("metricTaskProgress").textContent.replace("%", ""), lastArtifacts.length);
+        const preferred = ["result", "final_report", "reviews", "similar_cases", "evidence", "hpo"];
+        const firstType = preferred.find((type) => lastArtifacts.some((item) => item.artifact_type === type)) || lastArtifacts[0]?.artifact_type;
+        if (firstType) {
+          await loadArtifactDetail(firstType);
+        }
+      } catch (err) {
+        setStatus("artifactStatus", `加载失败：${err.message}`, "bad");
+      }
+    }
+
+    function initFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("task_id");
+      const base = params.get("base_url");
+      if (id) $("taskId").value = id;
+      if (base) $("baseUrl").value = base;
+      renderWorkflowRail(0, "");
+    }
+
+    $("connectBtn").addEventListener("click", connectSse);
+    $("loadBtn").addEventListener("click", loadResult);
+    $("artifactBtn").addEventListener("click", loadArtifacts);
+    $("artifactList").addEventListener("click", (event) => {
+      const target = event.target.closest("[data-artifact-type]");
+      if (!target) return;
+      loadArtifactDetail(target.dataset.artifactType || "");
+    });
+    initFromQuery();
+  </script>
+</body>
+</html>

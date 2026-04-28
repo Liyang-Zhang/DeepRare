@@ -15,6 +15,11 @@ Thumbs.db
 node_modules/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+.coverage
+htmlcov/
 config.ini
 .env
 secrets.txt

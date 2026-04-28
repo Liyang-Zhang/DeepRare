@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>yk-FERTA 病例工作台（演示版）</title>
+  <style>
+    :root {
+      --bg: #f2f6f4;
+      --panel: #ffffff;
+      --line: #cbd8cf;
+      --ink: #17352b;
+      --muted: #5a7268;
+      --brand: #1d6b52;
+      --brand-soft: #e5f2ec;
+      --ok: #1f8e56;
+      --warn: #b7791f;
+      --bad: #b83232;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f7fbf8, var(--bg));
+    }
+    .wrap {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero {
+      background: linear-gradient(140deg, #103f33 0%, #1d6b52 58%, #4b8f74 100%);
+      color: #fff;
+      border-radius: 18px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 26px; }
+    .hero p { margin: 0; color: rgba(255,255,255,0.9); }
+    .top-nav {
+      margin: 12px 0 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .top-nav a {
+      text-decoration: none;
+      border: 1px solid #cfe0d7;
+      background: #eff7f3;
+      color: var(--brand);
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(20, 56, 96, 0.07);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .panel > header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f7fbf8;
+      font-weight: 800;
+    }
+    .panel-body { padding: 16px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .full { grid-column: 1 / -1; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    input, textarea {
+      width: 100%;
+      margin-top: 6px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary { background: var(--brand); color: #fff; }
+    .secondary { background: var(--brand-soft); color: var(--brand); }
+    .muted { color: var(--muted); }
+    .status {
+      border: 1px solid var(--line);
+      background: #fbfdfc;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .status.ok { border-color: #bfe5cd; background: #f4fcf7; color: var(--ok); }
+    .status.bad { border-color: #efc5c5; background: #fff6f6; color: var(--bad); }
+    .hpo-list, .search-result {
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .hpo-row {
+      padding: 8px 10px;
+      border-bottom: 1px solid #edf2ef;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .hpo-row:last-child { border-bottom: 0; }
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      border: 1px solid #d9e7df;
+      background: #f3f8f5;
+      color: var(--brand);
+      padding: 1px 7px;
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .inline {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .inline > div { min-width: 220px; flex: 1; }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>yk-FERTA 病例工作台（演示版）</h1>
+      <p>目标：演示“临床输入 -> HPO确认 -> 发起任务”的标准入口。正式业务前端由平台侧接入替换。</p>
+    </section>
+
+    <div class="top-nav">
+      <a href="/debug/case-workbench">病例工作台</a>
+      <a href="/debug/task-viewer">任务结果页</a>
+      <a href="/debug/task-console">研发控制台（保留）</a>
+    </div>
+
+    <section class="panel">
+      <header>连接配置</header>
+      <div class="panel-body grid">
+        <label>
+          API Base URL
+          <input id="baseUrl" value="" placeholder="默认使用当前站点">
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>病例输入</header>
+      <div class="panel-body grid">
+        <label>
+          病例ID（可选）
+          <input id="caseId" placeholder="留空将自动生成">
+        </label>
+        <label>
+          患者ID（可选）
+          <input id="patientId" placeholder="留空将沿用 case_id 或自动生成">
+        </label>
+        <label>
+          主诉
+          <input id="chiefComplaint" value="不孕不育">
+        </label>
+        <label>
+          Top-K
+          <input id="topK" type="number" min="1" max="20" value="5">
+        </label>
+        <label class="full">
+          现病史
+          <textarea id="hpi">患者有不孕不育病史，既往发生两次葡萄胎妊娠，清宫后监测 hCG 下降，现咨询复发风险、遗传原因及后续生育方案。</textarea>
+        </label>
+        <label class="full">
+          既往史/家族史
+          <textarea id="history">无明确家族史记录。</textarea>
+        </label>
+        <label class="full">
+          实验室检查
+          <textarea id="labs"></textarea>
+        </label>
+        <label class="full">
+          影像学检查
+          <textarea id="imaging"></textarea>
+        </label>
+        <label class="full">
+          原始病历文本（可选）
+          <textarea id="rawNote"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>HPO 提取与人工确认</header>
+      <div class="panel-body">
+        <div class="actions">
+          <button id="extractBtn" class="secondary">1) 提取 HPO</button>
+        </div>
+        <div id="extractStatus" class="status muted">尚未提取。</div>
+
+        <div class="inline" style="margin-top:12px;">
+          <div>
+            <label>
+              搜索补充 HPO
+              <input id="hpoQuery" placeholder="输入关键词，如 葡萄胎 / infertility / HP:0032192">
+            </label>
+          </div>
+          <button id="searchBtn" class="secondary">搜索</button>
+        </div>
+        <div id="searchResult" class="search-result"></div>
+
+        <div style="margin-top:12px;font-weight:800;">已确认 HPO</div>
+        <div id="hpoList" class="hpo-list"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>任务发起</header>
+      <div class="panel-body">
+        <div class="actions">
+          <button id="runBtn" class="primary">2) 创建病例并运行任务</button>
+        </div>
+        <div id="runStatus" class="status muted">尚未发起任务。</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const confirmedHpo = [];
+
+    const $ = (id) => document.getElementById(id);
+
+    function escapeHtml(text) {
+      return String(text ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function apiBase() {
+      const val = $("baseUrl").value.trim();
+      return val || window.location.origin;
+    }
+
+    function setStatus(id, text, tone = "") {
+      const el = $(id);
+      el.className = `status ${tone}`.trim();
+      el.textContent = text;
+    }
+
+    function buildPatientPayload() {
+      const caseId = $("caseId").value.trim();
+      const patientId = $("patientId").value.trim() || caseId || `patient_${Date.now()}`;
+      return {
+        patient_id: patientId,
+        chief_complaint: $("chiefComplaint").value.trim(),
+        history_of_present_illness: $("hpi").value.trim(),
+        past_medical_history: $("history").value.trim(),
+        laboratory_findings: $("labs").value.trim(),
+        imaging_findings: $("imaging").value.trim(),
+        raw_note: $("rawNote").value.trim(),
+      };
+    }
+
+    function addHpo(item) {
+      const key = `${item.code || ""}|${item.label || ""}`.toLowerCase();
+      if (!key.trim()) return;
+      if (confirmedHpo.some((h) => `${h.code || ""}|${h.label || ""}`.toLowerCase() === key)) return;
+      confirmedHpo.push({
+        label: item.label || "",
+        code: item.code || null,
+        source: item.source || "manual-review",
+        confidence: item.confidence ?? 1.0,
+        notes: item.notes || ""
+      });
+      renderHpoList();
+    }
+
+    function removeHpo(index) {
+      confirmedHpo.splice(index, 1);
+      renderHpoList();
+    }
+
+    function renderHpoList() {
+      const box = $("hpoList");
+      if (!confirmedHpo.length) {
+        box.innerHTML = `<div class="hpo-row muted">暂无确认 HPO。</div>`;
+        return;
+      }
+      box.innerHTML = confirmedHpo.map((item, idx) => `
+        <div class="hpo-row">
+          <div>
+            <strong>${escapeHtml(item.label)}</strong>
+            ${item.code ? `<span class="chip">${escapeHtml(item.code)}</span>` : ""}
+            <div class="muted">source=${escapeHtml(item.source || "-")} confidence=${item.confidence ?? "-"}</div>
+          </div>
+          <button class="secondary" data-remove="${idx}">移除</button>
+        </div>
+      `).join("");
+      box.querySelectorAll("button[data-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => removeHpo(Number(btn.getAttribute("data-remove"))));
+      });
+    }
+
+    async function extractHpo() {
+      setStatus("extractStatus", "正在提取 HPO ...");
+      try {
+        const res = await fetch(`${apiBase()}/api/v1/hpo/extract`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patient_payload: buildPatientPayload()
+          })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const phenos = Array.isArray(data.phenotypes) ? data.phenotypes : [];
+        phenos.forEach((item) => addHpo(item));
+        setStatus("extractStatus", `提取完成：新增 ${phenos.length} 条（可继续增删确认）。`, "ok");
+      } catch (err) {
+        setStatus("extractStatus", `提取失败：${err.message}`, "bad");
+      }
+    }
+
+    async function searchHpo() {
+      const q = $("hpoQuery").value.trim();
+      const box = $("searchResult");
+      if (!q) {
+        box.innerHTML = `<div class="hpo-row muted">请输入关键词。</div>`;
+        return;
+      }
+      box.innerHTML = `<div class="hpo-row muted">搜索中...</div>`;
+      try {
+        const url = `${apiBase()}/api/v1/hpo/search?q=${encodeURIComponent(q)}&limit=20`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const hits = Array.isArray(data.hits) ? data.hits : [];
+        if (!hits.length) {
+          box.innerHTML = `<div class="hpo-row muted">无匹配结果。</div>`;
+          return;
+        }
+        box.innerHTML = hits.map((item, idx) => `
+          <div class="hpo-row">
+            <div>
+              <strong>${escapeHtml(item.chinese_label || item.label || "-")}</strong>
+              ${item.code ? `<span class="chip">${escapeHtml(item.code)}</span>` : ""}
+              <div class="muted">${escapeHtml(item.label || "")} · source=${escapeHtml(item.source || "-")}</div>
+            </div>
+            <button class="secondary" data-add="${idx}">添加</button>
+          </div>
+        `).join("");
+        box.querySelectorAll("button[data-add]").forEach((btn) => {
+          btn.addEventListener("click", () => addHpo(hits[Number(btn.getAttribute("data-add"))]));
+        });
+      } catch (err) {
+        box.innerHTML = `<div class="hpo-row" style="color:#b83232;">搜索失败：${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function createCaseAndRunTask() {
+      if (!confirmedHpo.length) {
+        setStatus("runStatus", "请先确认至少 1 条 HPO。", "bad");
+        return;
+      }
+
+      setStatus("runStatus", "正在创建病例并发起任务...");
+      try {
+        const caseIdRaw = $("caseId").value.trim();
+        const caseResp = await fetch(`${apiBase()}/api/v1/cases`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            case_id: caseIdRaw || null,
+            source: "demo-workbench",
+            input_mode: "clinical_note",
+            patient_payload: buildPatientPayload(),
+            manual_phenotypes: confirmedHpo
+          })
+        });
+        if (!caseResp.ok) throw new Error(`创建病例失败: HTTP ${caseResp.status}`);
+        const caseData = await caseResp.json();
+
+        const taskResp = await fetch(`${apiBase()}/api/v1/tasks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            case_id: caseData.case_id,
+            top_k: Number($("topK").value || 5),
+            workflow_name: "clinical_mvp_v1"
+          })
+        });
+        if (!taskResp.ok) throw new Error(`创建任务失败: HTTP ${taskResp.status}`);
+        const taskData = await taskResp.json();
+
+        const viewerUrl = `/debug/task-viewer?task_id=${encodeURIComponent(taskData.task_id)}&base_url=${encodeURIComponent(apiBase())}`;
+        setStatus(
+          "runStatus",
+          `已发起任务\ncase_id=${caseData.case_id}\ntask_id=${taskData.task_id}\n\n打开结果页：${viewerUrl}`,
+          "ok"
+        );
+        window.location.href = viewerUrl;
+      } catch (err) {
+        setStatus("runStatus", `任务发起失败：${err.message}`, "bad");
+      }
+    }
+
+    $("extractBtn").addEventListener("click", extractHpo);
+    $("searchBtn").addEventListener("click", searchHpo);
+    $("runBtn").addEventListener("click", createCaseAndRunTask);
+    renderHpoList();
+  </script>
+</body>
+</html>

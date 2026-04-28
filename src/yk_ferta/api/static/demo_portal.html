@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>yk-FERTA 临床诊断工作台</title>
+  <style>
+    :root {
+      --bg: #f2f6f4;
+      --panel: rgba(255, 255, 255, 0.92);
+      --line: #cbd8cf;
+      --ink: #17352b;
+      --muted: #5a7268;
+      --brand: #1d6b52;
+      --brand-strong: #0e4f3c;
+      --brand-soft: #e5f2ec;
+      --shadow: 0 18px 42px rgba(17, 53, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(199, 130, 47, 0.18), transparent 24%),
+        radial-gradient(circle at top left, rgba(29, 107, 82, 0.18), transparent 28%),
+        linear-gradient(180deg, #f7fbf8 0%, var(--bg) 100%);
+    }
+    .wrap {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px 22px 44px;
+    }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(140deg, #103f33 0%, #1d6b52 58%, #4b8f74 100%);
+      color: #fff;
+      border-radius: 28px;
+      padding: 34px 32px 30px;
+      box-shadow: 0 24px 50px rgba(16, 63, 51, 0.22);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -60px;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.24), rgba(255,255,255,0));
+      pointer-events: none;
+    }
+    .eyebrow {
+      display: inline-block;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      margin: 16px 0 10px;
+      font-size: clamp(30px, 5vw, 50px);
+      line-height: 1.06;
+      max-width: 760px;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      font-size: 16px;
+      line-height: 1.7;
+      color: rgba(255,255,255,0.9);
+    }
+    .hero-actions {
+      margin-top: 24px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .button.primary {
+      background: #fff;
+      color: var(--brand-strong);
+    }
+    .button.secondary {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border-color: rgba(255,255,255,0.18);
+    }
+    .section {
+      margin-top: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+    .step-no {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--brand-soft);
+      color: var(--brand-strong);
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+    .panel p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tag {
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #f6faf7;
+      border: 1px solid #d9e7df;
+      color: var(--brand-strong);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .panel a {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      height: 100%;
+    }
+    .jump {
+      margin-top: 16px;
+      color: var(--brand);
+      font-weight: 800;
+      font-size: 14px;
+    }
+    @media (max-width: 1024px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow">yk-FERTA clinical workspace</div>
+      <h1>临床诊断工作台</h1>
+      <p>病例录入、HPO 确认、任务化诊断推理与结构化结果审阅。</p>
+      <div class="hero-actions">
+        <a class="button primary" href="/debug/case-workbench">开始新病例</a>
+        <a class="button secondary" href="/debug/task-viewer">查看任务结果</a>
+        <a class="button secondary" href="/debug/task-console">研发控制台</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="grid">
+        <article class="panel">
+          <a href="/debug/case-workbench">
+            <div class="step-no">01</div>
+            <h3>新建病例</h3>
+            <p>录入临床信息并进入 HPO 确认流程。</p>
+            <div class="tags">
+              <span class="tag">clinical note</span>
+              <span class="tag">phenotype first</span>
+            </div>
+            <div class="jump">进入页面</div>
+          </a>
+        </article>
+        <article class="panel">
+          <a href="/debug/task-viewer">
+            <div class="step-no">02</div>
+            <h3>任务结果</h3>
+            <p>查看工作流推进、阶段产物与最终诊断结果。</p>
+            <div class="tags">
+              <span class="tag">workflow</span>
+              <span class="tag">diagnosis cards</span>
+            </div>
+            <div class="jump">进入页面</div>
+          </a>
+        </article>
+        <article class="panel">
+          <a href="/debug/task-console">
+            <div class="step-no">03</div>
+            <h3>研发控制台</h3>
+            <p>用于联调、排障和对照验证。</p>
+            <div class="tags">
+              <span class="tag">debug</span>
+              <span class="tag">traceability</span>
+            </div>
+            <div class="jump">进入页面</div>
+          </a>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
