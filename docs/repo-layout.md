@@ -20,7 +20,7 @@ the `yk-FERTA` development workspace.
   - Product notes, architecture drafts, and migration decisions.
 - `scripts/`
   - Operational and data preparation scripts for the new project.
-- Root-level `main.py`, `diagnosis.py`, `tools/`, etc.
+- `legacy/deeprare_reference/` for archived DeepRare entrypoints; `tools/` remains in place only for shared helpers.
   - Legacy `DeepRare` reference implementation. Do not extend here for new features.
 
 ## Recommended Near-Term Workstreams
