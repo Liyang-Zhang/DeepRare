@@ -1,0 +1,77 @@
+{
+  "openai": {
+    "api_key": "",
+    "base_url": "https://api.openai.com/v1"
+  },
+  "auth": {
+    "enabled": false,
+    "session_secret": "replace-with-a-random-secret",
+    "session_cookie_name": "yk_ferta_session",
+    "session_max_age_seconds": 43200,
+    "users": [
+      {
+        "username": "demo",
+        "password": "replace-me"
+      }
+    ]
+  },
+  "phenotype_extractor": {
+    "enabled": true,
+    "provider": "rag_hpo",
+    "rag_hpo_base_url": "http://rag-hpo-service:8000",
+    "rag_hpo_temperature": 0.3,
+    "rag_hpo_enable_infertility_filter": false,
+    "rag_hpo_request_timeout_seconds": 30,
+    "rag_hpo_poll_interval_seconds": 5.0,
+    "rag_hpo_poll_timeout_seconds": 120
+  },
+  "knowledge_searcher": {
+    "enabled": true,
+    "search_engine": "duckduckgo",
+    "google_api": "",
+    "search_engine_id": "",
+    "chrome_driver": "/usr/local/bin/chromedriver",
+    "visualize": false,
+    "mini_model_name": "gpt-4o-mini",
+    "web_results": 3,
+    "pubmed_results": 3,
+    "arxiv_results": 0,
+    "wiki_results": 0
+  },
+  "case_searcher": {
+    "enabled": true,
+    "case_bank_path": "./database/RDS_embeddings.csv",
+    "embedding_model": "text-embedding-3-small",
+    "top_n": 50,
+    "return_k": 3,
+    "llm_filter": false,
+    "filter_model_name": "gpt-4.1",
+    "mode": "fertility_dual",
+    "public_case_bank_path": "./database/fertility_public_cases_rds.csv",
+    "private_testing_case_bank_path": "./database/fertility_private_testing_cases_2025.with_hpo.csv",
+    "public_return_k": 3,
+    "private_return_k": 3,
+    "min_score": 0.01,
+    "vector_index_path": "./database/fertility_case_vector_index.npz",
+    "vector_metadata_path": "./database/fertility_case_vector_metadata.csv",
+    "vectorizer_path": "./database/fertility_case_vectorizer.joblib",
+    "vector_top_n": 200,
+    "vector_weight": 0.45
+  },
+  "reasoning": {
+    "model_name": "gpt-4.1",
+    "orphanet_path": "./database/orpha_disorders_HP_map.json",
+    "orpha_concept2id_path": "./database/orpha_concept2id.json",
+    "orpha2name_path": "./database/orpha2name.json",
+    "orpha2omim_path": "./database/orpha2omim.json",
+    "disease_normalization_top_n": 5,
+    "disease_normalization_llm_temperature": 0.0
+  },
+  "phenotype_analyser": {
+    "enabled": true,
+    "enable_pubcasefinder": false,
+    "enable_phenobrain": true,
+    "enable_hpo_association": true,
+    "hpo_association_top_n": 5
+  }
+}

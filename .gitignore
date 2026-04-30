@@ -26,7 +26,14 @@ secrets.txt
 database/*
 *.csv
 *.json
+!config/*.template.json
 exomizer-*/
 exomiser_results/*
 result/
 dataset/*
+yk-ferta-core.tar
+runtime/
+hf-cache/
+outputs/
+data/
+src/yk_ferta.egg-info/

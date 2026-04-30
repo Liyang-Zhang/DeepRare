@@ -1,4 +1,4 @@
-# yk-FERTA 接口契约 v1.1（对接文档）
+# yk-FERTA 接口契约 v1.2（对接文档）
 
 本文档用于 IT 集成对接，覆盖：
 
@@ -7,7 +7,7 @@
 - 示例请求/响应
 - 错误处理模板与重试建议
 
-> 版本：`v1.1`  
+> 版本：`v1.2`  
 > 服务入口：`/api/v1`  
 > 鉴权：当前无（后续由公司系统网关/平台层接入）
 
@@ -20,6 +20,12 @@
 3. `GET /api/v1/tasks/{task_id}/events` 订阅 SSE 进度
 4. 任务完成后 `GET /api/v1/tasks/{task_id}/result`
 5. 如需中间产物，调用 `GET /api/v1/tasks/{task_id}/artifacts`
+
+补充边界：
+
+- 正式前端主消费 `/api/v1/tasks/{task_id}/result`
+- `/artifacts` 仅用于追溯、审计、研发调试
+- 若需复刻工作流中间过程，可读取 `/artifacts`，但不应依赖其替代 `/result`
 
 ---
 
@@ -54,6 +60,19 @@
 - `ARTIFACT_NOT_FOUND`
 - `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD`
 - `IDEMPOTENCY_RESOURCE_MISSING`
+
+### 2.0.1 契约冻结范围
+
+当前版本已冻结以下输出边界：
+
+- `/api/v1/tasks/{task_id}`：任务快照
+- `/api/v1/tasks/{task_id}/result`：正式结果接口
+- `/api/v1/tasks/{task_id}/events`：SSE 进度事件
+
+当前版本未冻结为正式前端强依赖的部分：
+
+- artifact 内部细字段的长期兼容性
+- 研发调试页面内部展示结构
 
 ## 2.1 健康检查
 
@@ -379,7 +398,10 @@
 
 ```json
 {
-  "detail": "task not found"
+  "error_code": "TASK_NOT_FOUND",
+  "message": "任务不存在",
+  "retryable": false,
+  "details": null
 }
 ```
 
@@ -395,13 +417,20 @@
 
 ```json
 {
-  "detail": "artifact not found"
+  "error_code": "ARTIFACT_NOT_FOUND",
+  "message": "指定产物不存在",
+  "retryable": false,
+  "details": {
+    "artifact_type": "reviews"
+  }
 }
 ```
 
 ---
 
 ### GET `/api/v1/tasks/{task_id}/result`
+
+该接口是正式前端优先依赖的主结果接口。
 
 #### 200
 
@@ -448,6 +477,10 @@
           "cautions": []
         }
       ]
+    },
+    "stage_notes": {
+      "entry_mode": "manual-phenotypes",
+      "search_depth": "1"
     }
   },
   "timing": {
@@ -456,6 +489,20 @@
   }
 }
 ```
+
+`response` 顶层字段当前冻结为：
+
+- `patient_id`
+- `phenotypes`
+- `phenotype_hints`
+- `phenotype_tool_runs`
+- `knowledge_evidence`
+- `similar_cases`
+- `initial_candidates`
+- `normalized_candidates`
+- `reviews`
+- `final_recommendation`
+- `stage_notes`
 
 #### 404
 
@@ -529,8 +576,10 @@ data:{"task_id":"task_43b79d7c6f95","step":"comprehensive_analysis","task_stage"
 
 ```text
 event:done
-data:{"task_id":"task_43b79d7c6f95","step":"task_all_done","progress":100,"task_stage":999,"seq_in_stage":999,"message":"completed","data":{}}
+data:{"task_id":"task_43b79d7c6f95","step":"task_all_done","progress":100,"task_stage":999,"seq_in_stage":999,"message":"completed","ts_ms":1776671595999,"data":{}}
 ```
+
+终态事件与普通事件使用同一数据结构，只是额外通过 `event:done` 表示流结束。
 
 ---
 
@@ -542,16 +591,12 @@ data:{"task_id":"task_43b79d7c6f95","step":"task_all_done","progress":100,"task_
 
 ```json
 {
-  "detail": "xxx"
+  "error_code": "TASK_RESULT_NOT_READY",
+  "message": "任务结果尚未生成",
+  "retryable": true,
+  "details": null
 }
 ```
-
-常见 `detail`：
-
-- `case not found`
-- `task not found`
-- `artifact not found`
-- `result not available`
 
 ---
 
@@ -574,7 +619,7 @@ data:{"task_id":"task_43b79d7c6f95","step":"task_all_done","progress":100,"task_
 ## 4.3 客户端错误处理模板（建议）
 
 ```text
-if HTTP 404 and detail == "result not available":
+if HTTP 404 and error_code == "TASK_RESULT_NOT_READY":
   继续订阅 SSE 或轮询 task 状态
 
 if task.status == "failed":
@@ -591,7 +636,7 @@ if SSE 中断:
 
 ## 5. 重试策略（建议）
 
-- `POST /cases`、`POST /tasks`：调用方自行保证幂等（当前服务未内置幂等键）
+- `POST /cases`、`POST /tasks`：支持 `Idempotency-Key`
 - `GET /tasks/{id}`、`GET /result`、`GET /artifacts`：可安全重试
 - SSE 断线：带 `Last-Event-ID` 重连
 - 外部依赖抖动（上游 API）：建议在业务层触发“重建任务重跑”
@@ -602,14 +647,16 @@ if SSE 中断:
 
 1. 当前接口无鉴权，生产接入请通过公司网关层统一鉴权。
 2. `result.response` 为主业务负载，`timing` 用于性能与排障。
-3. `diagnosis_cards` 中的 `disease_genes` 与 `molecular_mechanism` 是疾病知识，不等同于患者本人已检出分子异常。
-4. 私有历史检测案例在推理中作为 `testing_finding_reference`，仅供参考，不作为确诊证据。
+3. artifact 用于追溯和研发调试，不应替代 `/result` 作为正式前端唯一数据源。
+4. `diagnosis_cards` 中的 `disease_genes` 与 `molecular_mechanism` 是疾病知识，不等同于患者本人已检出分子异常。
+5. 私有历史检测案例在推理中作为 `testing_finding_reference`，仅供参考，不作为确诊证据。
 
 ---
 
 ## 7. 版本策略
 
 - 当前文档对应 `v1`。
+- 当前交付冻结版本为 `v1.2`。
 - 后续如字段变更，建议采用：
   - 路径升级：`/api/v2/...`，或
   - 响应体加 `schema_version`（向后兼容）

@@ -99,6 +99,13 @@
       color: #fff;
       border-color: rgba(255,255,255,0.18);
     }
+    .inline-form {
+      margin: 0;
+    }
+    .inline-form button {
+      cursor: pointer;
+      font: inherit;
+    }
     .section {
       margin-top: 24px;
     }
@@ -180,6 +187,9 @@
         <a class="button primary" href="/debug/case-workbench">开始新病例</a>
         <a class="button secondary" href="/debug/task-viewer">查看任务结果</a>
         <a class="button secondary" href="/debug/task-console">研发控制台</a>
+        <form class="inline-form" method="post" action="/logout">
+          <button class="button secondary" type="submit">退出登录</button>
+        </form>
       </div>
     </section>
 

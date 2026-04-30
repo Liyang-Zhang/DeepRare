@@ -49,6 +49,28 @@
       color: rgba(255,255,255,0.88);
       line-height: 1.6;
     }
+    .top-nav {
+      margin: -8px 0 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .top-nav a,
+    .top-nav button {
+      text-decoration: none;
+      border: 1px solid #d7e3db;
+      background: #f5faf7;
+      color: var(--accent);
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .top-nav form {
+      margin: 0;
+    }
     .grid {
       display: grid;
       grid-template-columns: minmax(360px, 420px) minmax(0, 1fr);
@@ -682,6 +704,16 @@
       <h1>yk-FERTA 诊断推理控制台</h1>
       <p>用于本地验证最小服务端链路。页面会调用病例和任务接口，实时消费 SSE 事件，并在任务完成后拉取结构化结果。</p>
     </section>
+
+    <div class="top-nav">
+      <a href="/demo">演示入口</a>
+      <a href="/debug/case-workbench">病例工作台</a>
+      <a href="/debug/task-viewer">任务结果页</a>
+      <a href="/debug/task-console">研发控制台</a>
+      <form method="post" action="/logout">
+        <button type="submit">退出登录</button>
+      </form>
+    </div>
 
     <div class="grid">
       <section class="panel">

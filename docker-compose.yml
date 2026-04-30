@@ -1,0 +1,25 @@
+services:
+  yk-ferta-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yk-ferta-core:local
+    container_name: yk-ferta-core
+    ports:
+      - "8000:8000"
+    environment:
+      YK_FERTA_HOST: 0.0.0.0
+      YK_FERTA_PORT: 8000
+      YK_FERTA_DB_PATH: /app/runtime/yk_ferta.sqlite3
+      YK_FERTA_CONFIG_PATH: /app/config/clinical_mvp.json
+      YK_FERTA_RAG_HPO_BASE_URL: http://host.docker.internal:18080
+      HF_HOME: /app/.cache/huggingface
+      TRANSFORMERS_CACHE: /app/.cache/huggingface/transformers
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./database:/app/database:ro
+      - ./runtime:/app/runtime
+      - ./hf-cache:/app/.cache/huggingface
+      - ./config/clinical_mvp.json:/app/config/clinical_mvp.json:ro
+    restart: unless-stopped

@@ -58,6 +58,21 @@
       font-weight: 700;
       font-size: 13px;
     }
+    .top-nav form {
+      margin: 0;
+    }
+    .top-nav button {
+      text-decoration: none;
+      border: 1px solid #cfe0d7;
+      background: #eff7f3;
+      color: #1d6b52;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+    }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -527,6 +542,9 @@
       <a href="/debug/case-workbench">病例工作台</a>
       <a href="/debug/task-viewer">任务结果页</a>
       <a href="/debug/task-console">研发控制台（保留）</a>
+      <form method="post" action="/logout">
+        <button type="submit">退出登录</button>
+      </form>
     </div>
 
     <section class="panel">

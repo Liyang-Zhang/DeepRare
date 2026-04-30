@@ -25,6 +25,18 @@ class ManualPhenotype(BaseModel):
     confidence: float | None = 1.0
     notes: str = ""
 
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "label": "Hydatidiform mole",
+                "code": "HP:0032192",
+                "source": "manual-review",
+                "confidence": 1.0,
+                "notes": "医生确认后保留",
+            }
+        }
+    }
+
 
 class CreateCaseRequest(BaseModel):
     case_id: str | None = None
@@ -32,6 +44,30 @@ class CreateCaseRequest(BaseModel):
     input_mode: Literal["clinical_note", "phenotype_first"] | None = None
     patient_payload: dict[str, Any]
     manual_phenotypes: list[str | ManualPhenotype] = Field(default_factory=list)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "source": "web-ui",
+                "input_mode": "clinical_note",
+                "patient_payload": {
+                    "patient_id": "patient_demo_001",
+                    "chief_complaint": "不孕不育",
+                    "present_illness": "两次葡萄胎妊娠后未再成功妊娠",
+                    "history": "家族中有类似异常妊娠史",
+                },
+                "manual_phenotypes": [
+                    {
+                        "label": "Hydatidiform mole",
+                        "code": "HP:0032192",
+                        "source": "manual-review",
+                        "confidence": 1.0,
+                        "notes": "",
+                    }
+                ],
+            }
+        }
+    }
 
 
 class CaseResponse(BaseModel):
@@ -48,6 +84,16 @@ class CreateTaskRequest(BaseModel):
     case_id: str
     top_k: int = 5
     workflow_name: str = "clinical_mvp_v1"
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "case_id": "case_demo_001",
+                "top_k": 5,
+                "workflow_name": "clinical_mvp_v1",
+            }
+        }
+    }
 
 
 class TaskResponse(BaseModel):
@@ -133,8 +179,53 @@ class ResultResponse(BaseModel):
     timing: dict[str, Any] | None = None
 
 
+class ResultBodyResponse(BaseModel):
+    patient_id: str = ""
+    phenotypes: list[Any] = Field(default_factory=list)
+    phenotype_hints: list[Any] = Field(default_factory=list)
+    phenotype_tool_runs: list[Any] = Field(default_factory=list)
+    knowledge_evidence: list[Any] = Field(default_factory=list)
+    similar_cases: list[Any] = Field(default_factory=list)
+    initial_candidates: list[Any] = Field(default_factory=list)
+    normalized_candidates: list[Any] = Field(default_factory=list)
+    reviews: list[Any] = Field(default_factory=list)
+    final_recommendation: FinalRecommendationResponse = Field(
+        default_factory=FinalRecommendationResponse
+    )
+    stage_notes: dict[str, str] = Field(default_factory=dict)
+
+
+class FrozenResultResponse(BaseModel):
+    response: ResultBodyResponse
+    timing: dict[str, Any] | None = None
+
+
+class TaskEventResponse(BaseModel):
+    task_id: str
+    step: str
+    task_stage: int
+    seq_in_stage: int
+    progress: int
+    message: str
+    ts_ms: int
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
 class HpoExtractRequest(BaseModel):
     patient_payload: dict[str, Any]
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "patient_payload": {
+                    "patient_id": "patient_demo_001",
+                    "chief_complaint": "不孕不育",
+                    "present_illness": "两次葡萄胎妊娠",
+                    "history": "家族中有不明原因妊娠异常",
+                }
+            }
+        }
+    }
 
 
 class HpoExtractResponse(BaseModel):

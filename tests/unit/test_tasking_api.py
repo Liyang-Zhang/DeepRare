@@ -1,4 +1,5 @@
 import json
+import importlib
 import time
 
 from fastapi.testclient import TestClient
@@ -13,6 +14,39 @@ def _write_stub_config(path):
   "openai": {
     "api_key": "",
     "base_url": ""
+  },
+  "phenotype_extractor": {
+    "enabled": false
+  },
+  "knowledge_searcher": {
+    "enabled": false
+  },
+  "case_searcher": {
+    "enabled": false
+  }
+}
+        """.strip(),
+        encoding="utf-8",
+    )
+
+
+def _write_auth_config(path):
+    path.write_text(
+        """
+{
+  "openai": {
+    "api_key": "",
+    "base_url": ""
+  },
+  "auth": {
+    "enabled": true,
+    "session_secret": "pytest-secret",
+    "users": [
+      {
+        "username": "demo",
+        "password": "pass123"
+      }
+    ]
   },
   "phenotype_extractor": {
     "enabled": false
@@ -176,6 +210,93 @@ def test_task_api_accepts_reviewed_hpo_objects(tmp_path):
     assert result["phenotypes"][0]["code"] == "HP:0032192"
 
 
+def test_create_case_returns_409_when_case_id_already_exists(tmp_path):
+    db_path = tmp_path / "yk_ferta.sqlite3"
+    config_path = tmp_path / "clinical_mvp.json"
+    _write_stub_config(config_path)
+
+    app = create_app(db_path=str(db_path), default_config_path=str(config_path))
+    client = TestClient(app)
+
+    payload = {
+        "case_id": "case_demo_duplicate",
+        "source": "pytest",
+        "input_mode": "clinical_note",
+        "patient_payload": {
+            "patient_id": "patient_demo_duplicate",
+            "chief_complaint": "不孕不育",
+        },
+        "manual_phenotypes": [],
+    }
+
+    first = client.post("/api/v1/cases", json=payload)
+    assert first.status_code == 200
+
+    second = client.post("/api/v1/cases", json=payload)
+    assert second.status_code == 409
+    assert second.json()["error_code"] == "CASE_ALREADY_EXISTS"
+    assert second.json()["details"]["case_id"] == "case_demo_duplicate"
+
+
+def test_module_level_app_reads_runtime_paths_from_env(monkeypatch, tmp_path):
+    db_path = tmp_path / "runtime" / "yk_ferta.sqlite3"
+    config_path = tmp_path / "config" / "clinical_mvp.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_stub_config(config_path)
+
+    monkeypatch.setenv("YK_FERTA_DB_PATH", str(db_path))
+    monkeypatch.setenv("YK_FERTA_CONFIG_PATH", str(config_path))
+
+    import yk_ferta.api.app as app_module
+
+    importlib.reload(app_module)
+
+    assert app_module.app.state.store.db_path == db_path
+
+
+def test_config_load_allows_deployment_env_overrides(monkeypatch, tmp_path):
+    config_path = tmp_path / "clinical_mvp.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "openai": {
+                    "api_key": "file-key",
+                    "base_url": "https://file.example/v1",
+                },
+                "phenotype_extractor": {
+                    "provider": "rag_hpo",
+                    "model_name": "file-extractor-model",
+                    "rag_hpo_base_url": "http://127.0.0.1:18080",
+                },
+                "knowledge_searcher": {"mini_model_name": "file-mini-model"},
+                "case_searcher": {"filter_model_name": "file-filter-model"},
+                "reasoning": {"model_name": "file-reasoning-model"},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("YK_FERTA_OPENAI_API_KEY", "env-key")
+    monkeypatch.setenv("YK_FERTA_OPENAI_BASE_URL", "https://env.example/v1")
+    monkeypatch.setenv("YK_FERTA_PHENOTYPE_EXTRACTOR_MODEL_NAME", "env-extractor-model")
+    monkeypatch.setenv("YK_FERTA_RAG_HPO_BASE_URL", "http://host.docker.internal:18080")
+    monkeypatch.setenv("YK_FERTA_KNOWLEDGE_MINI_MODEL_NAME", "env-mini-model")
+    monkeypatch.setenv("YK_FERTA_CASE_FILTER_MODEL_NAME", "env-filter-model")
+    monkeypatch.setenv("YK_FERTA_REASONING_MODEL_NAME", "env-reasoning-model")
+
+    from yk_ferta.config import ClinicalMvpConfig
+
+    cfg = ClinicalMvpConfig.load(config_path)
+    assert cfg.openai.api_key == "env-key"
+    assert cfg.openai.base_url == "https://env.example/v1"
+    assert cfg.phenotype_extractor.model_name == "env-extractor-model"
+    assert cfg.phenotype_extractor.rag_hpo_base_url == "http://host.docker.internal:18080"
+    assert cfg.knowledge_searcher.mini_model_name == "env-mini-model"
+    assert cfg.case_searcher.filter_model_name == "env-filter-model"
+    assert cfg.reasoning.model_name == "env-reasoning-model"
+
+
 def test_task_events_endpoint_streams_until_done(tmp_path):
     db_path = tmp_path / "yk_ferta.sqlite3"
     config_path = tmp_path / "clinical_mvp.json"
@@ -211,6 +332,12 @@ def test_task_events_endpoint_streams_until_done(tmp_path):
     assert "case_ingestion" in joined
     assert "completed" in joined or "task_all_done" in joined
     assert "phenotype_analysis" in joined
+    done_lines = [line for line in chunks if isinstance(line, str) and '"step": "task_all_done"' in line]
+    assert done_lines
+    done_payload = json.loads(done_lines[-1].split("data:", 1)[1])
+    assert done_payload["task_stage"] == 999
+    assert done_payload["seq_in_stage"] == 999
+    assert done_payload["ts_ms"] > 0
 
 
 def test_task_console_page_is_available(tmp_path):
@@ -248,6 +375,27 @@ def test_demo_portal_page_is_available(tmp_path):
     assert "/debug/case-workbench" in response.text
     assert "/debug/task-viewer" in response.text
     assert "新建病例" in response.text
+
+
+def test_swagger_ui_and_openapi_are_available(tmp_path):
+    db_path = tmp_path / "yk_ferta.sqlite3"
+    config_path = tmp_path / "clinical_mvp.json"
+    _write_stub_config(config_path)
+
+    app = create_app(db_path=str(db_path), default_config_path=str(config_path))
+    client = TestClient(app)
+
+    docs_resp = client.get("/docs")
+    assert docs_resp.status_code == 200
+    assert "Swagger UI" in docs_resp.text
+    assert "yk-FERTA API" in docs_resp.text
+
+    openapi_resp = client.get("/openapi.json")
+    assert openapi_resp.status_code == 200
+    schema = openapi_resp.json()
+    assert schema["info"]["title"] == "yk-FERTA API"
+    assert any(tag["name"] == "tasks" for tag in schema["tags"])
+    assert "/api/v1/tasks/{task_id}/result" in schema["paths"]
 
 
 def test_task_viewer_page_contains_workflow_visualization_sections(tmp_path):
@@ -478,3 +626,63 @@ def test_validation_error_returns_structured_error(tmp_path):
     assert response.json()["error_code"] == "INVALID_REQUEST"
     assert response.json()["retryable"] is False
     assert "errors" in response.json()["details"]
+
+
+def test_auth_redirects_debug_pages_to_login_when_enabled(tmp_path):
+    db_path = tmp_path / "yk_ferta.sqlite3"
+    config_path = tmp_path / "clinical_mvp.json"
+    _write_auth_config(config_path)
+
+    app = create_app(db_path=str(db_path), default_config_path=str(config_path))
+    client = TestClient(app, follow_redirects=False)
+
+    response = client.get("/demo", headers={"accept": "text/html"})
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/login?next=/demo")
+
+
+def test_auth_rejects_api_requests_without_login(tmp_path):
+    db_path = tmp_path / "yk_ferta.sqlite3"
+    config_path = tmp_path / "clinical_mvp.json"
+    _write_auth_config(config_path)
+
+    app = create_app(db_path=str(db_path), default_config_path=str(config_path))
+    client = TestClient(app)
+
+    response = client.get("/api/v1/hpo/search", params={"q": "Hydatidiform mole"})
+    assert response.status_code == 401
+    assert response.json()["error_code"] == "AUTH_REQUIRED"
+
+
+def test_auth_login_allows_debug_pages_and_api(tmp_path):
+    db_path = tmp_path / "yk_ferta.sqlite3"
+    config_path = tmp_path / "clinical_mvp.json"
+    _write_auth_config(config_path)
+
+    app = create_app(db_path=str(db_path), default_config_path=str(config_path))
+    client = TestClient(app, follow_redirects=False)
+
+    login_page = client.get("/login")
+    assert login_page.status_code == 200
+    assert "内网调试面板登录" in login_page.text
+
+    login = client.post(
+        "/login",
+        data={"username": "demo", "password": "pass123", "next": "/demo"},
+    )
+    assert login.status_code == 303
+    assert login.headers["location"] == "/demo"
+    assert "yk_ferta_session" in login.headers.get("set-cookie", "")
+
+    cookies = login.cookies
+    demo = client.get("/demo", cookies=cookies)
+    assert demo.status_code == 200
+    assert "临床诊断工作台" in demo.text
+
+    api = client.get(
+        "/api/v1/hpo/search",
+        params={"q": "Hydatidiform mole", "limit": 5},
+        cookies=cookies,
+    )
+    assert api.status_code == 200
+    assert any(item["code"] == "HP:0032192" for item in api.json()["hits"])

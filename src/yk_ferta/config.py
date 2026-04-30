@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -12,10 +13,33 @@ DEFAULT_CONFIG_PATH = Path("config/clinical_mvp.json")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _env_or(current: str, *keys: str) -> str:
+    for key in keys:
+        value = os.getenv(key, "").strip()
+        if value:
+            return value
+    return current
+
+
 @dataclass(slots=True)
 class OpenAIConfig:
     api_key: str = ""
     base_url: str = ""
+
+
+@dataclass(slots=True)
+class AuthUserConfig:
+    username: str = ""
+    password: str = ""
+
+
+@dataclass(slots=True)
+class AuthConfig:
+    enabled: bool = False
+    session_secret: str = "yk-ferta-dev-secret"
+    session_cookie_name: str = "yk_ferta_session"
+    session_max_age_seconds: int = 43200
+    users: list[AuthUserConfig] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -95,6 +119,7 @@ class ReasoningConfig:
 @dataclass(slots=True)
 class ClinicalMvpConfig:
     openai: OpenAIConfig = field(default_factory=OpenAIConfig)
+    auth: AuthConfig = field(default_factory=AuthConfig)
     phenotype_extractor: PhenotypeExtractorConfig = field(
         default_factory=PhenotypeExtractorConfig
     )
@@ -121,8 +146,18 @@ class ClinicalMvpConfig:
         with config_path.open("r", encoding="utf-8") as handle:
             raw = json.load(handle)
 
-        return cls(
+        config = cls(
             openai=OpenAIConfig(**raw.get("openai", {})),
+            auth=AuthConfig(
+                **{
+                    **{k: v for k, v in raw.get("auth", {}).items() if k != "users"},
+                    "users": [
+                        AuthUserConfig(**item)
+                        for item in raw.get("auth", {}).get("users", [])
+                        if isinstance(item, dict)
+                    ],
+                }
+            ),
             phenotype_extractor=PhenotypeExtractorConfig(
                 **raw.get("phenotype_extractor", {})
             ),
@@ -135,3 +170,40 @@ class ClinicalMvpConfig:
             case_searcher=CaseSearcherConfig(**raw.get("case_searcher", {})),
             reasoning=ReasoningConfig(**raw.get("reasoning", {})),
         )
+
+        # Deployment-sensitive overrides come from environment variables first.
+        config.openai.api_key = _env_or(
+            config.openai.api_key,
+            "YK_FERTA_OPENAI_API_KEY",
+            "OPENAI_API_KEY",
+        )
+        config.openai.base_url = _env_or(
+            config.openai.base_url,
+            "YK_FERTA_OPENAI_BASE_URL",
+            "OPENAI_BASE_URL",
+        )
+        config.auth.session_secret = _env_or(
+            config.auth.session_secret,
+            "YK_FERTA_SESSION_SECRET",
+        )
+        config.phenotype_extractor.model_name = _env_or(
+            config.phenotype_extractor.model_name,
+            "YK_FERTA_PHENOTYPE_EXTRACTOR_MODEL_NAME",
+        )
+        config.phenotype_extractor.rag_hpo_base_url = _env_or(
+            config.phenotype_extractor.rag_hpo_base_url,
+            "YK_FERTA_RAG_HPO_BASE_URL",
+        )
+        config.knowledge_searcher.mini_model_name = _env_or(
+            config.knowledge_searcher.mini_model_name,
+            "YK_FERTA_KNOWLEDGE_MINI_MODEL_NAME",
+        )
+        config.case_searcher.filter_model_name = _env_or(
+            config.case_searcher.filter_model_name,
+            "YK_FERTA_CASE_FILTER_MODEL_NAME",
+        )
+        config.reasoning.model_name = _env_or(
+            config.reasoning.model_name,
+            "YK_FERTA_REASONING_MODEL_NAME",
+        )
+        return config
