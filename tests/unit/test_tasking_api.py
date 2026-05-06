@@ -478,6 +478,44 @@ def test_hpo_extract_endpoint_accepts_legacy_patient_payload_keys(tmp_path):
     assert response.json()["phenotypes"]
 
 
+def test_hpo_extract_endpoint_runs_blocking_extraction_in_threadpool(tmp_path, monkeypatch):
+    db_path = tmp_path / "yk_ferta.sqlite3"
+    config_path = tmp_path / "clinical_mvp.json"
+    _write_stub_config(config_path)
+
+    app_module = importlib.import_module("yk_ferta.api.app")
+    called = {}
+    original = app_module.run_in_threadpool
+
+    async def fake_run_in_threadpool(func, *args, **kwargs):
+        called["func"] = func
+        called["args"] = args
+        called["kwargs"] = kwargs
+        return await original(func, *args, **kwargs)
+
+    monkeypatch.setattr(app_module, "run_in_threadpool", fake_run_in_threadpool)
+
+    app = create_app(db_path=str(db_path), default_config_path=str(config_path))
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/hpo/extract",
+        json={
+            "patient_payload": {
+                "patient_id": "extract-threadpool-001",
+                "chief_complaint": "Infertility",
+                "present_illness": "Short narrative.",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["phenotypes"]
+    assert called["func"] is app_module._extract_hpo_response
+    assert called["args"][0]["patient_id"] == "extract-threadpool-001"
+    assert called["args"][1] == str(config_path)
+
+
 def test_create_case_normalizes_legacy_patient_payload_keys(tmp_path):
     db_path = tmp_path / "yk_ferta.sqlite3"
     config_path = tmp_path / "clinical_mvp.json"

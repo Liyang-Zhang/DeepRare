@@ -18,6 +18,7 @@ from pathlib import Path
 from fastapi import FastAPI, Header, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from yk_ferta.api.schemas import (
     ArtifactListResponse,
@@ -103,6 +104,26 @@ def _error_payload(error_code: str, message: str, retryable: bool, details: dict
 def _request_fingerprint(payload: dict) -> str:
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _extract_hpo_response(patient_payload: dict, config_path: str) -> HpoExtractResponse:
+    """Run blocking phenotype extraction outside the event loop."""
+    config = ClinicalMvpConfig.load(config_path)
+    pipeline = build_clinical_mvp_pipeline(config=config)
+    patient = PatientProfile(**_normalize_patient_payload(patient_payload))
+    phenotypes = pipeline.phenotype_extractor.extract(patient)
+    return HpoExtractResponse(
+        phenotypes=[
+            ManualPhenotype(
+                label=item.label,
+                code=item.code,
+                source=item.source,
+                confidence=item.confidence,
+                notes=item.notes,
+            )
+            for item in phenotypes
+        ]
+    )
 
 
 def _sign_session(username: str, secret: str) -> str:
@@ -494,21 +515,10 @@ def create_app(
         summary="提取病例中的 HPO/表型",
     )
     async def extract_hpo(payload: HpoExtractRequest) -> HpoExtractResponse:
-        config = ClinicalMvpConfig.load(default_config_path)
-        pipeline = build_clinical_mvp_pipeline(config=config)
-        patient = PatientProfile(**_normalize_patient_payload(payload.patient_payload))
-        phenotypes = pipeline.phenotype_extractor.extract(patient)
-        return HpoExtractResponse(
-            phenotypes=[
-                ManualPhenotype(
-                    label=item.label,
-                    code=item.code,
-                    source=item.source,
-                    confidence=item.confidence,
-                    notes=item.notes,
-                )
-                for item in phenotypes
-            ]
+        return await run_in_threadpool(
+            _extract_hpo_response,
+            payload.patient_payload,
+            default_config_path,
         )
 
     @app.get(
