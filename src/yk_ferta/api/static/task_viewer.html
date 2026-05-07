@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>yk-FERTA 任务结果页（演示版）</title>
+  <title>yk-FERTA 诊断结果</title>
   <style>
     :root {
       --bg: #f2f6f4;
@@ -88,6 +88,26 @@
       font-weight: 800;
     }
     .panel-body { padding: 16px; }
+    .collapsible-panel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      background: #f7fbf8;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .collapsible-panel summary::-webkit-details-marker { display: none; }
+    .collapsible-panel summary .meta {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .collapsible-panel[open] summary {
+      border-bottom: 1px solid var(--line);
+    }
     .grid {
       display: grid;
       grid-template-columns: 360px minmax(0, 1fr);
@@ -296,12 +316,94 @@
       font-weight: 700;
     }
     .result-card .hero-summary {
-      border: 1px solid #dce9e2;
-      background: #f4f9f6;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
+      border: 1px solid #cfe2d7;
+      background: linear-gradient(140deg, #f5fbf7 0%, #eef7f2 100%);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 14px;
       line-height: 1.65;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.65);
+    }
+    .top-diagnosis-spotlight {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+      gap: 16px;
+      align-items: stretch;
+      margin-top: 14px;
+    }
+    .top-diagnosis-main {
+      border: 1px solid #d7e8de;
+      border-radius: 16px;
+      background: #fff;
+      padding: 16px;
+    }
+    .top-diagnosis-side {
+      border: 1px solid #d7e8de;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff, #f6fbf8);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .spotlight-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e7f4ed;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .spotlight-title {
+      margin: 0 0 6px;
+      font-size: 28px;
+      line-height: 1.25;
+      color: #103f33;
+    }
+    .spotlight-subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .spotlight-summary {
+      font-size: 14px;
+      color: #27465e;
+      line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .spotlight-points {
+      margin: 0;
+      padding-left: 18px;
+      color: #27465e;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+    .summary-metrics {
+      display: grid;
+      gap: 10px;
+    }
+    .summary-metric {
+      border: 1px solid #deebe4;
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+    }
+    .summary-metric .k {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .summary-metric .v {
+      color: #103f33;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.35;
+      word-break: break-word;
     }
     .result-card .section-title {
       margin: 14px 0 8px;
@@ -516,7 +618,7 @@
       color: #27465e;
     }
     @media (max-width: 1120px) {
-      .grid, .two-col, .summary-grid, .workflow-summary, .card-grid, .evidence-columns, .diagnosis-card-grid {
+      .grid, .two-col, .summary-grid, .workflow-summary, .card-grid, .evidence-columns, .diagnosis-card-grid, .top-diagnosis-spotlight {
         grid-template-columns: 1fr;
       }
       .workflow-rail {
@@ -533,15 +635,13 @@
 <body>
   <div class="wrap">
     <section class="hero">
-      <h1>yk-FERTA 任务结果页（演示版）</h1>
-      <p>目标：不仅展示最终诊断卡，还要把工作流阶段、证据生成和复核路径可视化，符合 yk-FERTA 的“可追踪临床推理系统”定位。</p>
+      <h1>yk-FERTA 诊断结果</h1>
+      <p>用于查看分析进度、诊断建议、依据说明与后续建议，支持临床复核与过程追踪。</p>
     </section>
 
     <div class="top-nav">
-      <a href="/demo">演示入口</a>
-      <a href="/debug/case-workbench">病例工作台</a>
-      <a href="/debug/task-viewer">任务结果页</a>
-      <a href="/debug/task-console">研发控制台（保留）</a>
+      <a href="/debug/case-workbench">病例录入</a>
+      <a href="/debug/task-viewer">诊断结果</a>
       <form method="post" action="/logout">
         <button type="submit">退出登录</button>
       </form>
@@ -560,11 +660,11 @@
             <input id="taskId" placeholder="task_xxx">
           </label>
           <div class="actions">
-            <button id="connectBtn" class="primary">连接 SSE</button>
-            <button id="loadBtn" class="secondary">加载结果</button>
-            <button id="artifactBtn" class="secondary">查看 Artifacts</button>
+            <button id="connectBtn" class="primary">实时查看进度</button>
+            <button id="loadBtn" class="secondary">加载诊断结果</button>
+            <button id="artifactBtn" class="secondary">查看过程资料</button>
           </div>
-          <div id="connStatus" class="status muted">未连接。</div>
+          <div id="connStatus" class="status muted">请输入任务编号后查看分析进度。</div>
         </div>
         <div>
           <div class="summary-grid">
@@ -581,7 +681,7 @@
               <div id="metricTaskProgress" class="v">0%</div>
             </div>
             <div class="metric-card">
-              <div class="k">Artifacts</div>
+              <div class="k">过程资料</div>
               <div id="metricArtifacts" class="v">0</div>
             </div>
           </div>
@@ -596,8 +696,11 @@
       </div>
     </section>
 
-    <section class="panel">
-      <header>阶段回放</header>
+    <details class="panel collapsible-panel">
+      <summary>
+        <span>阶段回放</span>
+        <span class="meta">按需展开查看事件流与阶段摘要</span>
+      </summary>
       <div class="panel-body two-col">
         <div>
           <div class="muted" style="font-weight:800; margin-bottom:8px;">事件流</div>
@@ -606,28 +709,28 @@
         <div>
           <div class="muted" style="font-weight:800; margin-bottom:8px;">阶段摘要</div>
           <div id="workflowSummary" class="workflow-summary">
-            <div class="stage-card"><h4>工作流摘要</h4><p>任务完成后会显示 HPO、证据检索、相似病例、初步诊断、复核与最终综合等阶段概览。</p></div>
+            <div class="stage-card"><h4>工作流摘要</h4><p>任务加载后将在此显示表型确认、证据检索、候选复核与最终建议概览。</p></div>
           </div>
         </div>
       </div>
-    </section>
+    </details>
 
     <section class="panel">
       <header>最终结果（result）</header>
       <div class="panel-body">
-        <div id="resultSummary" class="status muted">尚未加载结果。</div>
+        <div id="resultSummary" class="status muted">请输入任务编号后加载诊断结果。</div>
         <div id="diagnosisCards"></div>
         <div id="traceabilityPanel"></div>
       </div>
     </section>
 
     <section class="panel">
-      <header>Artifacts</header>
+      <header>过程资料</header>
       <div class="panel-body">
-        <div id="artifactStatus" class="status muted">尚未加载。</div>
+        <div id="artifactStatus" class="status muted">尚未加载过程资料。</div>
         <div id="artifactList"></div>
         <div id="artifactDetail" class="artifact-detail">
-          <div class="muted">点击上方 artifact 类型后显示详情。</div>
+          <div class="muted">点击上方资料类型后显示详情。</div>
         </div>
       </div>
     </section>
@@ -879,6 +982,19 @@
       return item?.code ? `${primary}（${item.code}）` : primary;
     }
 
+    function productizeSummary(summary) {
+      const text = String(summary || "").trim();
+      if (!text) return "已完成病例分析，请结合下方诊断建议、依据说明与后续建议进行综合评估。";
+      const internalMarkers = [
+        "Clinical MVP 已按 DeepRare 风格完成一轮可追溯鉴别诊断",
+        "该结果用于开发验证",
+      ];
+      if (internalMarkers.some((marker) => text.includes(marker))) {
+        return "已完成病例分析，请结合下方诊断建议、依据说明与后续建议进行综合评估。";
+      }
+      return text;
+    }
+
     function renderTable(headers, rows) {
       return `
         <div style="overflow:auto;">
@@ -990,7 +1106,7 @@
         return `
           <div class="artifact-card" style="margin-bottom:10px;">
             <h4>最终摘要</h4>
-            <p>${escapeHtml(finalRec.summary || "-")}</p>
+            <p>${escapeHtml(productizeSummary(finalRec.summary || "-"))}</p>
             <p>主诊断信心：${Number(finalRec.final_diagnosis_confidence_percent || 0) ? `${Number(finalRec.final_diagnosis_confidence_percent || 0)}%` : "-"}</p>
           </div>
           ${cards.map((card, index) => `
@@ -1104,7 +1220,7 @@
         </div>
         <div class="stage-card">
           <h4>6. 最终综合</h4>
-          <p>输出 ${diagnosisCards.length} 张诊断卡。总耗时 ${timing?.total_duration_ms ?? "-"} ms。当前页面展示的是医生可审阅结果，而不是单次黑箱文本。</p>
+          <p>输出 ${diagnosisCards.length} 张诊断卡。总耗时 ${timing?.total_duration_ms ?? "-"} ms。当前结果可用于查看诊断建议、依据说明与后续建议。</p>
           <div class="chips">${diagnosisCards.slice(0, 4).map((item) => `<span class="tag">${escapeHtml(item.disease_name_zh || item.clinical_diagnosis || "-")}</span>`).join("") || "<span class='tag'>暂无</span>"}</div>
         </div>
       `;
@@ -1142,6 +1258,13 @@
         ? (topDiagnosisCard.disease_name_zh || topDiagnosisCard.clinical_diagnosis || "-")
         : (topCandidate?.name || normalizedCandidates[0]?.normalized_name || "-");
       const diseaseGenes = compactList(topDiagnosisCard?.disease_genes || []);
+      const topSupportLevel = topDiagnosisCard?.support_level || "-";
+      const topMatchPercent = topDiagnosisCard?.diagnosis_match_percent ?? 0;
+      const topReviewConfidence = topDiagnosisCard?.confidence ?? "-";
+      const topSecondaryName = topDiagnosisCard ? diagnosisSecondaryName(topDiagnosisCard) : "";
+      const topRecommendedTests = compactList(topDiagnosisCard?.recommended_tests || []);
+      const topReasoningPoints = (topDiagnosisCard?.supporting_evidence || []).slice(0, 3);
+      const topMissingPoints = (topDiagnosisCard?.missing_evidence || []).slice(0, 2);
 
       const topPhenotypes = phenotypes.map((item) => phenotypeDisplay(item)).join("、");
       const toolSummary = toolRuns.map((item) => `${item.source}:${item.status}`).join(" / ");
@@ -1234,12 +1357,46 @@
           <div class="result-card">
             <div class="hero-summary">
               <h3 style="margin:0 0 8px;">最终诊断摘要</h3>
-              <div class="compact-text">${escapeHtml(finalRecommendation.summary || "任务完成后显示最终摘要。")}</div>
-              <div class="chips">
-                <span class="tag">临床诊断 ${escapeHtml(clinicalDiagnosis)}</span>
-                <span class="tag">主诊断信心 ${finalDiagnosisConfidencePercent ? `${finalDiagnosisConfidencePercent}%` : "-"}</span>
-                <span class="tag">致病基因/区域 ${escapeHtml(diseaseGenes)}</span>
-                <span class="tag">复核支持 ${supportedReviews.length} / ${reviews.length}</span>
+              <div class="compact-text">${escapeHtml(productizeSummary(finalRecommendation.summary || "任务完成后显示最终摘要。"))}</div>
+              <div class="top-diagnosis-spotlight">
+                <div class="top-diagnosis-main">
+                  <div class="spotlight-label">TOP1 优先诊断</div>
+                  <h4 class="spotlight-title">${escapeHtml(clinicalDiagnosis)}</h4>
+                  ${topSecondaryName ? `<div class="spotlight-subtitle">${escapeHtml(topSecondaryName)}</div>` : ""}
+                  <div class="spotlight-summary">当前病例的表型表现、候选复核结果与相关证据综合后，该诊断为当前最优先考虑的方向。</div>
+                  ${(topReasoningPoints.length || topMissingPoints.length) ? `
+                    <ul class="spotlight-points">
+                      ${topReasoningPoints.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+                      ${topMissingPoints.map((item) => `<li>仍需补充：${escapeHtml(item)}</li>`).join("")}
+                    </ul>
+                  ` : ""}
+                </div>
+                <div class="top-diagnosis-side">
+                  <div class="summary-metric">
+                    <div class="k">主诊断信心</div>
+                    <div class="v">${finalDiagnosisConfidencePercent ? `${finalDiagnosisConfidencePercent}%` : "-"}</div>
+                  </div>
+                  <div class="summary-metric">
+                    <div class="k">诊断信心 / 支持度</div>
+                    <div class="v">${topMatchPercent ? `${topMatchPercent}%` : "-"} · ${escapeHtml(topSupportLevel)}</div>
+                  </div>
+                  <div class="summary-metric">
+                    <div class="k">复核置信度</div>
+                    <div class="v">${escapeHtml(String(topReviewConfidence))}</div>
+                  </div>
+                  <div class="summary-metric">
+                    <div class="k">致病基因 / 区域</div>
+                    <div class="v">${escapeHtml(diseaseGenes)}</div>
+                  </div>
+                  <div class="summary-metric">
+                    <div class="k">建议优先检查</div>
+                    <div class="v">${escapeHtml(topRecommendedTests)}</div>
+                  </div>
+                  <div class="summary-metric">
+                    <div class="k">复核支持</div>
+                    <div class="v">${supportedReviews.length} / ${reviews.length}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1333,7 +1490,7 @@
           <div class="audit-card"><h4>5. 初步诊断</h4><table class="trace-table"><thead><tr><th>排序</th><th>候选</th><th>分数</th><th>理由</th></tr></thead><tbody>${candidateRows || "<tr><td colspan='4'>-</td></tr>"}</tbody></table></div>
           <div class="audit-card"><h4>6. 疾病标准化</h4><table class="trace-table"><thead><tr><th>原始名称</th><th>标准名称</th><th>ID</th><th>体系</th></tr></thead><tbody>${normalizedRows || "<tr><td colspan='4'>-</td></tr>"}</tbody></table></div>
           <div class="audit-card"><h4>7. 反思复审</h4>${reviewItems || "<div class='compact-text'>-</div>"}</div>
-          <div class="audit-card"><h4>8. 最终诊断建议</h4><div class="compact-text"><strong>总结：</strong>${escapeHtml(finalRecommendation.summary || "-")}</div><div style="margin:10px 0;">${diagnosisCardItems || "<div class='compact-text'>-</div>"}</div><div class="compact-text"><strong>下一步：</strong>${escapeHtml((finalRecommendation.next_steps || []).join("；") || "-")}</div><div class="compact-text"><strong>注意事项：</strong>${escapeHtml((finalRecommendation.cautions || []).join("；") || "-")}</div></div>
+          <div class="audit-card"><h4>8. 最终诊断建议</h4><div class="compact-text"><strong>总结：</strong>${escapeHtml(productizeSummary(finalRecommendation.summary || "-"))}</div><div style="margin:10px 0;">${diagnosisCardItems || "<div class='compact-text'>-</div>"}</div><div class="compact-text"><strong>下一步：</strong>${escapeHtml((finalRecommendation.next_steps || []).join("；") || "-")}</div><div class="compact-text"><strong>注意事项：</strong>${escapeHtml((finalRecommendation.cautions || []).join("；") || "-")}</div></div>
         </div>
       `;
     }
@@ -1454,7 +1611,7 @@
         const timing = data.timing || {};
         setStatus(
           "resultSummary",
-          `加载成功\n摘要：${finalRec.summary || "无"}\n总耗时：${timing.total_duration_ms ?? "-"} ms`,
+          `加载成功\n摘要：${productizeSummary(finalRec.summary || "无")}\n总耗时：${timing.total_duration_ms ?? "-"} ms`,
           "ok"
         );
         renderWorkflowSummary(response, timing);

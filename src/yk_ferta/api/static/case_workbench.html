@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>yk-FERTA 病例工作台（演示版）</title>
+  <title>yk-FERTA 病例录入与表型确认</title>
   <style>
     :root {
       --bg: #f2f6f4;
@@ -179,14 +179,13 @@
 <body>
   <div class="wrap">
     <section class="hero">
-      <h1>yk-FERTA 病例工作台（演示版）</h1>
-      <p>目标：演示“临床输入 -> HPO确认 -> 发起任务”的标准入口。正式业务前端由平台侧接入替换。</p>
+      <h1>yk-FERTA 病例录入与表型确认</h1>
+      <p>用于录入病例信息、确认 HPO 表型，并发起后续诊断分析。</p>
     </section>
 
     <div class="top-nav">
-      <a href="/debug/case-workbench">病例工作台</a>
-      <a href="/debug/task-viewer">任务结果页</a>
-      <a href="/debug/task-console">研发控制台（保留）</a>
+      <a href="/debug/case-workbench">病例录入</a>
+      <a href="/debug/task-viewer">诊断结果</a>
       <form method="post" action="/logout">
         <button type="submit">退出登录</button>
       </form>
@@ -250,7 +249,7 @@
         <div class="actions">
           <button id="extractBtn" class="secondary">1) 提取 HPO</button>
         </div>
-        <div id="extractStatus" class="status muted">尚未提取。</div>
+        <div id="extractStatus" class="status muted">请先录入病例信息，然后提取并确认 HPO 表型。</div>
 
         <div class="inline" style="margin-top:12px;">
           <div>
@@ -274,7 +273,7 @@
         <div class="actions">
           <button id="runBtn" class="primary">2) 创建病例并运行任务</button>
         </div>
-        <div id="runStatus" class="status muted">尚未发起任务。</div>
+        <div id="runStatus" class="status muted">确认 HPO 后即可发起分析任务。</div>
       </div>
     </section>
   </div>
@@ -372,7 +371,7 @@
     }
 
     async function extractHpo() {
-      setStatus("extractStatus", "正在提取 HPO ...");
+      setStatus("extractStatus", "正在提取 HPO 表型，请稍候...");
       try {
         const res = await fetch(`${apiBase()}/api/v1/hpo/extract`, {
           method: "POST",
@@ -385,9 +384,9 @@
         const data = await res.json();
         const phenos = Array.isArray(data.phenotypes) ? data.phenotypes : [];
         phenos.forEach((item) => addHpo(item));
-        setStatus("extractStatus", `提取完成：新增 ${phenos.length} 条（可继续增删确认）。`, "ok");
+        setStatus("extractStatus", `已提取 ${phenos.length} 条 HPO，请核对后继续。`, "ok");
       } catch (err) {
-        setStatus("extractStatus", `提取失败：${err.message}`, "bad");
+        setStatus("extractStatus", `HPO 提取失败：${err.message}`, "bad");
       }
     }
 
@@ -395,10 +394,10 @@
       const q = $("hpoQuery").value.trim();
       const box = $("searchResult");
       if (!q) {
-        box.innerHTML = `<div class="hpo-row muted">请输入关键词。</div>`;
+        box.innerHTML = `<div class="hpo-row muted">请输入 HPO 关键词或编号。</div>`;
         return;
       }
-      box.innerHTML = `<div class="hpo-row muted">搜索中...</div>`;
+      box.innerHTML = `<div class="hpo-row muted">正在搜索...</div>`;
       try {
         const url = `${apiBase()}/api/v1/hpo/search?q=${encodeURIComponent(q)}&limit=20`;
         const res = await fetch(url);
@@ -406,7 +405,7 @@
         const data = await res.json();
         const hits = Array.isArray(data.hits) ? data.hits : [];
         if (!hits.length) {
-          box.innerHTML = `<div class="hpo-row muted">无匹配结果。</div>`;
+          box.innerHTML = `<div class="hpo-row muted">未找到匹配结果。</div>`;
           return;
         }
         box.innerHTML = hits.map((item, idx) => `
@@ -429,11 +428,11 @@
 
     async function createCaseAndRunTask() {
       if (!confirmedHpo.length) {
-        setStatus("runStatus", "请先确认至少 1 条 HPO。", "bad");
+        setStatus("runStatus", "请先确认至少 1 条 HPO 表型。", "bad");
         return;
       }
 
-      setStatus("runStatus", "正在创建病例并发起任务...");
+      setStatus("runStatus", "正在创建病例并启动分析...");
       try {
         const caseIdRaw = $("caseId").value.trim();
         const caseResp = await fetch(`${apiBase()}/api/v1/cases`, {
@@ -465,12 +464,12 @@
         const viewerUrl = `/debug/task-viewer?task_id=${encodeURIComponent(taskData.task_id)}&base_url=${encodeURIComponent(apiBase())}`;
         setStatus(
           "runStatus",
-          `已发起任务\ncase_id=${caseData.case_id}\ntask_id=${taskData.task_id}\n\n打开结果页：${viewerUrl}`,
+          `分析任务已创建\n病例编号：${caseData.case_id}\n任务编号：${taskData.task_id}\n\n正在跳转到结果页...`,
           "ok"
         );
         window.location.href = viewerUrl;
       } catch (err) {
-        setStatus("runStatus", `任务发起失败：${err.message}`, "bad");
+        setStatus("runStatus", `启动分析失败：${err.message}`, "bad");
       }
     }
 

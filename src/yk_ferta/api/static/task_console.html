@@ -702,14 +702,13 @@
   <div class="page">
     <section class="hero">
       <h1>yk-FERTA 诊断推理控制台</h1>
-      <p>用于本地验证最小服务端链路。页面会调用病例和任务接口，实时消费 SSE 事件，并在任务完成后拉取结构化结果。</p>
+      <p>用于录入病例、查看分析进度，并在任务完成后查看结构化诊断结果与过程说明。</p>
     </section>
 
     <div class="top-nav">
-      <a href="/demo">演示入口</a>
-      <a href="/debug/case-workbench">病例工作台</a>
-      <a href="/debug/task-viewer">任务结果页</a>
-      <a href="/debug/task-console">研发控制台</a>
+      <a href="/debug/case-workbench">病例录入</a>
+      <a href="/debug/task-viewer">诊断结果</a>
+      <a href="/debug/task-console">任务控制台</a>
       <form method="post" action="/logout">
         <button type="submit">退出登录</button>
       </form>
@@ -966,9 +965,22 @@
         .replaceAll("'", "&#39;");
     }
 
+    function productizeSummary(summary) {
+      const text = String(summary || "").trim();
+      if (!text) return "已完成病例分析，请结合下方诊断建议、依据说明与后续建议进行综合评估。";
+      const internalMarkers = [
+        "Clinical MVP 已按 DeepRare 风格完成一轮可追溯鉴别诊断",
+        "该结果用于开发验证",
+      ];
+      if (internalMarkers.some((marker) => text.includes(marker))) {
+        return "已完成病例分析，请结合下方诊断建议、依据说明与后续建议进行综合评估。";
+      }
+      return text;
+    }
+
     function clearView() {
       ui.eventStream.innerHTML = "";
-      ui.summaryBlock.textContent = "任务完成后会显示最终诊断摘要、建议和耗时。";
+      ui.summaryBlock.textContent = "任务完成后会显示诊断摘要、建议和耗时。";
       ui.traceabilityBlock.textContent = "任务完成后会按 HPO、资料检索、相似案例、初诊、复审、终诊展示结构化证据。";
       ui.resultJson.textContent = "{}";
       ui.failureMeta.textContent = "-";
@@ -1355,7 +1367,7 @@
         <div class="product-view">
           <div class="diagnosis-hero">
             <h3>最终诊断摘要</h3>
-            <div class="summary">${escapeHtml(finalRecommendation.summary || "任务完成后显示最终摘要。")}</div>
+            <div class="summary">${escapeHtml(productizeSummary(finalRecommendation.summary || "任务完成后显示最终摘要。"))}</div>
             <div class="diagnosis-meta-grid">
               <div class="diagnosis-meta"><div class="k">临床诊断 / 优先候选</div><div class="v">${escapeHtml(clinicalDiagnosis)}</div></div>
               <div class="diagnosis-meta"><div class="k">主诊断信心</div><div class="v">${finalDiagnosisConfidencePercent ? `${finalDiagnosisConfidencePercent}%` : "-"}</div></div>
@@ -1562,7 +1574,7 @@
           </div>
           <div class="audit-card">
             <h4>8. 最终诊断建议 <span class="hint">面向医生</span></h4>
-            <div class="compact-text"><strong>总结：</strong>${escapeHtml(finalRecommendation.summary || "-")}</div>
+            <div class="compact-text"><strong>总结：</strong>${escapeHtml(productizeSummary(finalRecommendation.summary || "-"))}</div>
             <div class="evidence-list" style="margin:10px 0;">${diagnosisCardItems || "<div class='compact-text'>-</div>"}</div>
             <div class="compact-text"><strong>下一步：</strong>${escapeHtml((finalRecommendation.next_steps || []).join("；") || "-")}</div>
             <div class="compact-text"><strong>注意事项：</strong>${escapeHtml((finalRecommendation.cautions || []).join("；") || "-")}</div>
