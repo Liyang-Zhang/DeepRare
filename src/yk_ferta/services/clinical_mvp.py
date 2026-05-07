@@ -2840,13 +2840,22 @@ class LlmFinalDiagnosisSynthesizer:
             self._reasoner = _OpenAIReasoner(self.api_key, self.model_name, self.base_url)
 
     @staticmethod
-    def _support_level(confidence: float | None) -> str:
-        value = confidence or 0.0
-        if value >= 0.8:
+    def _clamp_score(value: float | None, *, default: float = 0.0) -> float:
+        score = _safe_float(value, default)
+        return max(0.0, min(1.0, score))
+
+    @classmethod
+    def _support_level(cls, diagnosis_match_score: float | None) -> str:
+        value = cls._clamp_score(diagnosis_match_score)
+        if value >= 0.9:
             return "高"
-        if value >= 0.5:
+        if value >= 0.7:
             return "中"
         return "低"
+
+    @classmethod
+    def _diagnosis_match_percent(cls, diagnosis_match_score: float | None) -> int:
+        return int(round(cls._clamp_score(diagnosis_match_score) * 100))
 
     @staticmethod
     def _as_clean_list(value: object, limit: int = 8) -> list[str]:
@@ -2861,6 +2870,161 @@ class LlmFinalDiagnosisSynthesizer:
             for item in items[:limit]
             if _normalize_text(str(item))
         ]
+
+    @classmethod
+    def _evidence_strength_score(cls, review: CandidateReview | None) -> float:
+        if review is None:
+            return 0.35
+        support_count = len(review.supporting_evidence or [])
+        contradict_count = len(review.contradicting_evidence or [])
+        missing_count = len(review.missing_evidence or [])
+        evidence_id_count = len(review.evidence_ids or [])
+        score = (
+            0.35
+            + 0.10 * min(support_count, 4)
+            + 0.04 * min(evidence_id_count, 4)
+            - 0.10 * min(contradict_count, 3)
+            - 0.04 * min(missing_count, 4)
+        )
+        if not review.is_supported:
+            score = min(score, 0.45)
+        return cls._clamp_score(score, default=0.35)
+
+    @classmethod
+    def _compute_diagnosis_match_score(
+        cls,
+        candidate: CandidateCondition,
+        review: CandidateReview | None,
+        normalized: NormalizedDisease | None,
+    ) -> tuple[float, str]:
+        review_confidence = cls._clamp_score(
+            review.confidence if review and review.confidence is not None else (
+                0.6 if review and review.is_supported else candidate.score
+            ),
+            default=0.0,
+        )
+        candidate_score = cls._clamp_score(candidate.score, default=0.0)
+        normalization_confidence = cls._clamp_score(
+            normalized.normalization_decision_confidence
+            if normalized and normalized.normalization_decision_confidence is not None
+            else (normalized.mapping_score if normalized and normalized.mapping_score is not None else 0.45),
+            default=0.45,
+        )
+        evidence_strength = cls._evidence_strength_score(review)
+        match_score = (
+            0.55 * review_confidence
+            + 0.20 * candidate_score
+            + 0.15 * normalization_confidence
+            + 0.10 * evidence_strength
+        )
+        if review and not review.is_supported:
+            match_score = min(match_score, 0.49)
+        match_score = cls._clamp_score(match_score)
+        reason = (
+            f"复核置信度={review_confidence:.2f}，初轮候选分={candidate_score:.2f}，"
+            f"标准化置信度={normalization_confidence:.2f}，证据强度={evidence_strength:.2f}。"
+        )
+        return match_score, reason
+
+    @classmethod
+    def _top_final_diagnosis_confidence(cls, diagnosis_cards: list[dict[str, object]]) -> tuple[float, int]:
+        if not diagnosis_cards:
+            return 0.0, 0
+        top = diagnosis_cards[0]
+        confidence = cls._clamp_score(top.get("confidence"), default=0.0)
+        return confidence, int(round(confidence * 100))
+
+    @staticmethod
+    def _needs_chinese_localization(card: dict[str, object]) -> bool:
+        zh_name = _normalize_text(str(card.get("disease_name_zh", "")))
+        return bool(zh_name) and not _contains_cjk(zh_name)
+
+    def _localize_diagnosis_cards(
+        self,
+        diagnosis_cards: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        pending = [
+            (index, card)
+            for index, card in enumerate(diagnosis_cards)
+            if self._needs_chinese_localization(card)
+        ]
+        if not pending or not self.api_key:
+            return diagnosis_cards
+
+        self._ensure_reasoner()
+        if self._reasoner is None:
+            return diagnosis_cards
+
+        candidate_lines = []
+        for index, card in pending:
+            candidate_lines.append(
+                {
+                    "index": index,
+                    "clinical_diagnosis": _normalize_text(str(card.get("clinical_diagnosis", ""))),
+                    "disease_name_zh": _normalize_text(str(card.get("disease_name_zh", ""))),
+                    "disease_name_en": _normalize_text(str(card.get("disease_name_en", ""))),
+                    "omim_id": _normalize_text(str(card.get("omim_id", ""))),
+                    "orphanet_id": _normalize_text(str(card.get("orphanet_id", ""))),
+                }
+            )
+
+        prompt = (
+            "只返回 JSON，不要输出 Markdown 或额外解释。JSON 结构为 "
+            "{\"cards\":[{\"index\":0,\"disease_name_zh\":\"中文病名\",\"disease_name_en\":\"English name\"}]}。\n\n"
+            "任务：把疾病名整理成适合中文医生阅读的展示形式。\n"
+            "规则：\n"
+            "1. disease_name_zh 必须尽量输出自然、简洁、专业的中文病名。\n"
+            "2. 如果没有统一标准译名，请给出医生能理解的中文译名，不要保留纯英文。\n"
+            "3. disease_name_en 保留英文标准名；如果输入里已有合适英文名，尽量保留。\n"
+            "4. 不要扩写病情，不要加入解释性句子，只输出疾病名。\n"
+            "5. 同一疾病的中文表达前后一致。\n\n"
+            f"待处理疾病列表：\n{json.dumps(candidate_lines, ensure_ascii=False)}"
+        )
+        raw = self._reasoner.complete(
+            "你正在为中文临床产品整理疾病展示名。目标是为每个候选疾病生成稳定、自然、专业的中文病名，并保留英文名。",
+            prompt,
+            temperature=0.0,
+            seed=42,
+        )
+        parsed = _safe_json_loads(raw or "")
+        if not isinstance(parsed, dict):
+            return diagnosis_cards
+        localized_items = parsed.get("cards", [])
+        if not isinstance(localized_items, list):
+            return diagnosis_cards
+
+        localized_by_index: dict[int, dict[str, str]] = {}
+        for item in localized_items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                index = int(item.get("index"))
+            except Exception:
+                continue
+            localized_by_index[index] = {
+                "disease_name_zh": _normalize_text(str(item.get("disease_name_zh", ""))),
+                "disease_name_en": _normalize_text(str(item.get("disease_name_en", ""))),
+            }
+
+        merged_cards: list[dict[str, object]] = []
+        for index, card in enumerate(diagnosis_cards):
+            localized = localized_by_index.get(index)
+            if not localized:
+                merged_cards.append(card)
+                continue
+            updated = dict(card)
+            localized_zh = localized.get("disease_name_zh", "")
+            localized_en = localized.get("disease_name_en", "")
+            if localized_zh and _contains_cjk(localized_zh):
+                updated["disease_name_zh"] = localized_zh
+            if localized_en:
+                updated["disease_name_en"] = localized_en
+            elif _normalize_text(str(updated.get("disease_name_en", ""))) == "" and not _contains_cjk(
+                _normalize_text(str(updated.get("clinical_diagnosis", "")))
+            ):
+                updated["disease_name_en"] = _normalize_text(str(updated.get("clinical_diagnosis", "")))
+            merged_cards.append(updated)
+        return merged_cards
 
     def _fallback_diagnosis_cards(
         self,
@@ -2882,14 +3046,23 @@ class LlmFinalDiagnosisSynthesizer:
                 evidence_by_candidate.setdefault(_normalize_key(candidate_name), []).append(item)
         cards: list[dict[str, object]] = []
         for candidate in sorted_candidates[:5]:
-            review = review_by_name.get(_normalize_key(candidate.name))
             normalized = normalized_by_name.get(_normalize_key(candidate.name))
+            review = review_by_name.get(_normalize_key(candidate.name))
+            if normalized and not review:
+                review = review_by_name.get(_normalize_key(normalized.normalized_name))
+            if normalized and not review:
+                review = review_by_name.get(_normalize_key(normalized.original_name))
             if review and not normalized:
                 normalized = normalized_by_name.get(_normalize_key(review.candidate_name))
             candidate_evidence = evidence_by_candidate.get(_normalize_key(candidate.name), [])
             if normalized:
                 candidate_evidence.extend(evidence_by_candidate.get(_normalize_key(normalized.normalized_name), []))
             confidence = review.confidence if review else candidate.score
+            diagnosis_match_score, ranking_reason = self._compute_diagnosis_match_score(
+                candidate,
+                review,
+                normalized,
+            )
             missing_evidence = list(review.missing_evidence if review else [])
             if not has_patient_molecular_evidence and _contains_molecular_assertion(candidate.name):
                 missing_evidence.append(_UNCONFIRMED_MOLECULAR_CLAIM_NOTE)
@@ -2903,11 +3076,15 @@ class LlmFinalDiagnosisSynthesizer:
                 disease_name_en = candidate.name
             cards.append(
                 {
+                    "rank": 0,
+                    "diagnosis_match_score": diagnosis_match_score,
+                    "diagnosis_match_percent": self._diagnosis_match_percent(diagnosis_match_score),
                     "disease_name_zh": disease_name_zh,
                     "disease_name_en": disease_name_en,
                     "clinical_diagnosis": candidate.name,
-                    "support_level": self._support_level(confidence),
-                    "confidence": confidence,
+                    "support_level": self._support_level(diagnosis_match_score),
+                    "confidence": self._clamp_score(confidence, default=0.0),
+                    "ranking_reason": ranking_reason,
                     "omim_id": omim_ids[0] if omim_ids else "NA",
                     "omim_url": f"https://www.omim.org/entry/{omim_ids[0]}" if omim_ids else "",
                     "orphanet_id": orphanet_id or "NA",
@@ -2935,6 +3112,15 @@ class LlmFinalDiagnosisSynthesizer:
                     ],
                 }
             )
+        cards.sort(
+            key=lambda item: (
+                self._clamp_score(item.get("diagnosis_match_score"), default=0.0),
+                self._clamp_score(item.get("confidence"), default=0.0),
+            ),
+            reverse=True,
+        )
+        for index, card in enumerate(cards, start=1):
+            card["rank"] = index
         return cards
 
     @staticmethod
@@ -3035,6 +3221,88 @@ class LlmFinalDiagnosisSynthesizer:
                 return card
         return None
 
+    def _merge_llm_cards_with_canonical_ranking(
+        self,
+        raw_cards: list[dict[str, object]],
+        fallback_cards: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        if not raw_cards:
+            return fallback_cards
+        merged_cards: list[dict[str, object]] = []
+        consumed_ids: set[int] = set()
+        for fallback_card in fallback_cards:
+            matched_card: dict[str, object] | None = None
+            matched_index: int | None = None
+            fallback_probe = {
+                "clinical_diagnosis": fallback_card.get("clinical_diagnosis", ""),
+                "disease_name_zh": fallback_card.get("disease_name_zh", ""),
+                "disease_name_en": fallback_card.get("disease_name_en", ""),
+            }
+            for index, raw_card in enumerate(raw_cards):
+                if index in consumed_ids:
+                    continue
+                if self._find_fallback_card(raw_card, [fallback_card]) is not None:
+                    matched_card = raw_card
+                    matched_index = index
+                    break
+                if self._find_fallback_card(fallback_probe, [raw_card]) is not None:
+                    matched_card = raw_card
+                    matched_index = index
+                    break
+            if matched_card is None:
+                merged_cards.append(dict(fallback_card))
+                continue
+            consumed_ids.add(matched_index if matched_index is not None else -1)
+            merged = dict(fallback_card)
+            merged.update(
+                {
+                    "disease_name_zh": _normalize_text(str(matched_card.get("disease_name_zh", "")))
+                    or str(fallback_card.get("disease_name_zh", "")),
+                    "disease_name_en": _normalize_text(str(matched_card.get("disease_name_en", "")))
+                    or str(fallback_card.get("disease_name_en", "")),
+                    "clinical_diagnosis": _normalize_text(str(matched_card.get("clinical_diagnosis", "")))
+                    or str(fallback_card.get("clinical_diagnosis", "")),
+                    "inheritance": _normalize_text(str(matched_card.get("inheritance", "")))
+                    or str(fallback_card.get("inheritance", "NA")),
+                    "disease_genes": self._as_clean_list(matched_card.get("disease_genes", []))
+                    or list(fallback_card.get("disease_genes", [])),
+                    "molecular_mechanism": _normalize_text(str(matched_card.get("molecular_mechanism", "")))
+                    or str(fallback_card.get("molecular_mechanism", "NA")),
+                    "pathogenesis": _normalize_text(str(matched_card.get("pathogenesis", "")))
+                    or str(fallback_card.get("pathogenesis", "")),
+                    "specialties": self._as_clean_list(matched_card.get("specialties", []))
+                    or list(fallback_card.get("specialties", [])),
+                    "supporting_evidence": self._as_clean_list(matched_card.get("supporting_evidence", []))
+                    or list(fallback_card.get("supporting_evidence", [])),
+                    "contradicting_evidence": self._as_clean_list(matched_card.get("contradicting_evidence", []))
+                    or list(fallback_card.get("contradicting_evidence", [])),
+                    "missing_evidence": self._as_clean_list(matched_card.get("missing_evidence", []))
+                    or list(fallback_card.get("missing_evidence", [])),
+                    "recommended_tests": self._as_clean_list(matched_card.get("recommended_tests", []))
+                    or list(fallback_card.get("recommended_tests", [])),
+                    "references": [
+                        {
+                            "title": _normalize_text(str(ref.get("title", ""))),
+                            "source_type": self._normalize_reference_source_type(
+                                _normalize_text(str(ref.get("source_type", ""))),
+                                _normalize_text(str(ref.get("url", ""))),
+                                _normalize_text(str(ref.get("title", ""))),
+                            ),
+                            "url": _normalize_text(str(ref.get("url", ""))),
+                            "citation": _normalize_text(str(ref.get("citation", ""))),
+                        }
+                        for ref in matched_card.get("references", [])[:8]
+                        if isinstance(ref, dict)
+                    ]
+                    if isinstance(matched_card.get("references", []), list)
+                    else list(fallback_card.get("references", [])),
+                    "cautions": self._as_clean_list(matched_card.get("cautions", []))
+                    or list(fallback_card.get("cautions", [])),
+                }
+            )
+            merged_cards.append(merged)
+        return merged_cards
+
     def synthesize(
         self,
         patient: PatientProfile,
@@ -3085,6 +3353,10 @@ class LlmFinalDiagnosisSynthesizer:
             knowledge_evidence,
             has_patient_molecular_evidence,
         )
+        localized_fallback_cards = self._localize_diagnosis_cards(fallback_cards) if self.api_key else fallback_cards
+        fallback_final_confidence, fallback_final_confidence_percent = self._top_final_diagnosis_confidence(
+            localized_fallback_cards
+        )
 
         if not self.api_key:
             return TraceableRecommendation(
@@ -3094,7 +3366,9 @@ class LlmFinalDiagnosisSynthesizer:
                 reviews=reviews,
                 next_steps=fallback_next_steps,
                 cautions=fallback_cautions,
-                diagnosis_cards=fallback_cards,
+                final_diagnosis_confidence=fallback_final_confidence,
+                final_diagnosis_confidence_percent=fallback_final_confidence_percent,
+                diagnosis_cards=localized_fallback_cards,
             )
 
         self._ensure_reasoner()
@@ -3196,9 +3470,20 @@ class LlmFinalDiagnosisSynthesizer:
                             "disease_name_zh": disease_name_zh,
                             "disease_name_en": disease_name_en,
                             "clinical_diagnosis": clinical_diagnosis,
-                            "support_level": _normalize_text(str(item.get("support_level", "")))
-                            or "中",
-                            "confidence": _safe_float(item.get("confidence"), 0.0),
+                            "support_level": str(fallback_card.get("support_level", "中")) if fallback_card else "中",
+                            "confidence": _safe_float(
+                                fallback_card.get("confidence", 0.0) if fallback_card else item.get("confidence"),
+                                0.0,
+                            ),
+                            "rank": int(fallback_card.get("rank", 0)) if fallback_card else 0,
+                            "diagnosis_match_score": _safe_float(
+                                fallback_card.get("diagnosis_match_score", 0.0) if fallback_card else 0.0,
+                                0.0,
+                            ),
+                            "diagnosis_match_percent": int(
+                                fallback_card.get("diagnosis_match_percent", 0) if fallback_card else 0
+                            ),
+                            "ranking_reason": str(fallback_card.get("ranking_reason", "")) if fallback_card else "",
                             "omim_id": trusted_omim_id,
                             "omim_url": trusted_omim_url,
                             "orphanet_id": trusted_orphanet_id,
@@ -3242,6 +3527,11 @@ class LlmFinalDiagnosisSynthesizer:
                             "cautions": self._as_clean_list(item.get("cautions", [])),
                         }
                     )
+            diagnosis_cards = self._merge_llm_cards_with_canonical_ranking(diagnosis_cards, fallback_cards)
+            diagnosis_cards = self._localize_diagnosis_cards(diagnosis_cards)
+            final_confidence, final_confidence_percent = self._top_final_diagnosis_confidence(
+                diagnosis_cards or fallback_cards
+            )
             return TraceableRecommendation(
                 summary=_truncate(str(parsed.get("summary", fallback_summary)), 2000),
                 candidates=sorted_candidates,
@@ -3251,6 +3541,8 @@ class LlmFinalDiagnosisSynthesizer:
                 or fallback_next_steps,
                 cautions=[_normalize_text(str(item)) for item in cautions[:6] if _normalize_text(str(item))]
                 or fallback_cautions,
+                final_diagnosis_confidence=final_confidence,
+                final_diagnosis_confidence_percent=final_confidence_percent,
                 diagnosis_cards=diagnosis_cards or fallback_cards,
             )
 
@@ -3261,7 +3553,9 @@ class LlmFinalDiagnosisSynthesizer:
             reviews=reviews,
             next_steps=fallback_next_steps,
             cautions=fallback_cautions,
-            diagnosis_cards=fallback_cards,
+            final_diagnosis_confidence=fallback_final_confidence,
+            final_diagnosis_confidence_percent=fallback_final_confidence_percent,
+            diagnosis_cards=localized_fallback_cards,
         )
 
 
@@ -3352,6 +3646,7 @@ class StubFinalDiagnosisSynthesizer:
         reviews: list[CandidateReview],
     ) -> TraceableRecommendation:
         top_candidate = initial_candidates[0] if initial_candidates else None
+        top_score = _safe_float(top_candidate.score if top_candidate else 0.0, 0.0)
         return TraceableRecommendation(
             summary=(
                 "Clinical MVP 已按 DeepRare 风格阶段顺序组装占位输出。"
@@ -3369,13 +3664,19 @@ class StubFinalDiagnosisSynthesizer:
             cautions=[
                 "当前 MVP 服务仍是工程骨架，不适合直接用于临床。",
             ],
+            final_diagnosis_confidence=top_score,
+            final_diagnosis_confidence_percent=int(round(top_score * 100)),
             diagnosis_cards=[
                 {
+                    "rank": 1,
+                    "diagnosis_match_score": top_score,
+                    "diagnosis_match_percent": int(round(top_score * 100)),
                     "disease_name_zh": top_candidate.name if top_candidate else "待生成候选诊断",
                     "disease_name_en": "",
                     "clinical_diagnosis": top_candidate.name if top_candidate else "待生成候选诊断",
                     "support_level": "低",
-                    "confidence": top_candidate.score if top_candidate else 0.0,
+                    "confidence": top_score,
+                    "ranking_reason": "占位排序：仅按首个候选分数展示。",
                     "omim_id": "NA",
                     "omim_url": "",
                     "orphanet_id": "NA",

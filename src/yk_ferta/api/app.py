@@ -281,11 +281,15 @@ def _parse_login_form(body: bytes) -> tuple[str, str, str]:
 
 def _normalize_diagnosis_card(card: dict) -> DiagnosisCardResponse:
     return DiagnosisCardResponse(
+        rank=int(card.get("rank", 0) or 0),
+        diagnosis_match_score=float(card.get("diagnosis_match_score", 0.0) or 0.0),
+        diagnosis_match_percent=int(card.get("diagnosis_match_percent", 0) or 0),
         disease_name_zh=str(card.get("disease_name_zh", "") or ""),
         disease_name_en=str(card.get("disease_name_en", "") or ""),
         clinical_diagnosis=str(card.get("clinical_diagnosis", "") or ""),
         support_level=str(card.get("support_level", "中") or "中"),
         confidence=float(card.get("confidence", 0.0) or 0.0),
+        ranking_reason=str(card.get("ranking_reason", "") or ""),
         omim_id=str(card.get("omim_id", "NA") or "NA"),
         omim_url=str(card.get("omim_url", "") or ""),
         orphanet_id=str(card.get("orphanet_id", "NA") or "NA"),
@@ -342,6 +346,8 @@ def _freeze_result_contract(payload: dict) -> FrozenResultResponse:
         reviews=final_recommendation.get("reviews", []) or [],
         next_steps=[str(item) for item in final_recommendation.get("next_steps", []) if str(item).strip()],
         cautions=[str(item) for item in final_recommendation.get("cautions", []) if str(item).strip()],
+        final_diagnosis_confidence=float(final_recommendation.get("final_diagnosis_confidence", 0.0) or 0.0),
+        final_diagnosis_confidence_percent=int(final_recommendation.get("final_diagnosis_confidence_percent", 0) or 0),
         diagnosis_cards=[DiagnosisCardResponse(**item) for item in normalized_cards],
         ),
     )

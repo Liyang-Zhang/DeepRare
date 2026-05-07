@@ -135,11 +135,15 @@ def test_task_api_can_run_pipeline_and_persist_artifacts(tmp_path):
     assert "parallel_diagnosis" in result_payload["timing"]["stage_timings_ms"]
     diagnosis_card = result["final_recommendation"]["diagnosis_cards"][0]
     assert list(diagnosis_card.keys()) == [
+        "rank",
+        "diagnosis_match_score",
+        "diagnosis_match_percent",
         "disease_name_zh",
         "disease_name_en",
         "clinical_diagnosis",
         "support_level",
         "confidence",
+        "ranking_reason",
         "omim_id",
         "omim_url",
         "orphanet_id",
@@ -156,6 +160,7 @@ def test_task_api_can_run_pipeline_and_persist_artifacts(tmp_path):
         "references",
         "cautions",
     ]
+    assert result["final_recommendation"]["final_diagnosis_confidence_percent"] >= 0
     final_report_resp = client.get(f"/api/v1/tasks/{task_id}/artifacts/final_report")
     assert final_report_resp.status_code == 200
     artifact_card = final_report_resp.json()["data"]["final_recommendation"]["diagnosis_cards"][0]

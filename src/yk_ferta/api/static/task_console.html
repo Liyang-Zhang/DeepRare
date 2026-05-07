@@ -1206,6 +1206,7 @@
       const reviews = response.reviews || [];
       const finalRecommendation = response.final_recommendation || {};
       const diagnosisCards = finalRecommendation.diagnosis_cards || [];
+      const finalDiagnosisConfidencePercent = Number(finalRecommendation.final_diagnosis_confidence_percent || 0);
       const timing = result.timing || {};
       const supportedReviews = reviews.filter((item) => item.is_supported);
       const topCandidate = initialCandidates
@@ -1304,12 +1305,13 @@
           <div class="candidate-card">
             <div class="candidate-head">
               <div>
-                <div class="candidate-title">#${index + 1} ${escapeHtml(displayName)}</div>
+                <div class="candidate-title">#${card.rank || index + 1} ${escapeHtml(displayName)}</div>
                 ${englishName ? `<div class="muted">${escapeHtml(englishName)}</div>` : ""}
               </div>
-              <div>${badge(`支持度 ${card.support_level || "-"}`, card.support_level === "高" ? "ok" : card.support_level === "低" ? "bad" : "warn")} ${badge(`置信度 ${card.confidence ?? "-"}`)}</div>
+              <div>${badge(`诊断信心 ${card.diagnosis_match_percent ?? 0}%`, (Number(card.diagnosis_match_percent || 0) >= 90) ? "ok" : (Number(card.diagnosis_match_percent || 0) >= 70 ? "warn" : "bad"))} ${badge(`支持度 ${card.support_level || "-"}`, card.support_level === "高" ? "ok" : card.support_level === "低" ? "bad" : "warn")} ${badge(`复核置信度 ${card.confidence ?? "-"}`)}</div>
             </div>
           <div class="diagnosis-fact-grid">
+            <div class="label">排序依据</div><div class="value">${escapeHtml(card.ranking_reason || "综合表型、复核、标准化与证据强度计算。")}</div>
             <div class="label">OMIM</div><div class="value">${linkOrText(card.omim_id || "NA", card.omim_url)}</div>
             <div class="label">Orphanet</div><div class="value">${linkOrText(card.orphanet_id || "NA", card.orphanet_url)}</div>
             <div class="label">遗传方式</div><div class="value">${escapeHtml(card.inheritance || "NA")}</div>
@@ -1336,6 +1338,7 @@
             <div class="summary">${escapeHtml(finalRecommendation.summary || "任务完成后显示最终摘要。")}</div>
             <div class="diagnosis-meta-grid">
               <div class="diagnosis-meta"><div class="k">临床诊断 / 优先候选</div><div class="v">${escapeHtml(clinicalDiagnosis)}</div></div>
+              <div class="diagnosis-meta"><div class="k">主诊断信心</div><div class="v">${finalDiagnosisConfidencePercent ? `${finalDiagnosisConfidencePercent}%` : "-"}</div></div>
               <div class="diagnosis-meta"><div class="k">致病基因 / 区域</div><div class="v">${escapeHtml(diseaseGenes)}</div></div>
               <div class="diagnosis-meta"><div class="k">复核支持</div><div class="v">${supportedReviews.length} / ${reviews.length}</div></div>
             </div>

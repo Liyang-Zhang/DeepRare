@@ -337,12 +337,16 @@ def test_final_synthesizer_no_api_returns_structured_diagnosis_cards():
 
     assert recommendation.diagnosis_cards
     card = recommendation.diagnosis_cards[0]
+    assert "rank" in card
+    assert "diagnosis_match_score" in card
+    assert "diagnosis_match_percent" in card
     assert "disease_name_zh" in card
     assert "disease_name_en" in card
     assert card["clinical_diagnosis"] == "Recurrent hydatidiform mole due to NLRP7 mutations"
     assert "possible_molecular_subtype" not in card
     assert "molecular_mechanism" in card
     assert card["missing_evidence"]
+    assert recommendation.final_diagnosis_confidence_percent == int(round(card["confidence"] * 100))
 
 
 def test_final_synthesizer_no_api_keeps_molecular_info_disease_scoped():
@@ -440,6 +444,239 @@ def test_final_synthesizer_ignores_llm_hallucinated_omim_id():
     assert card["omim_id"] == "NA"
     assert card["omim_url"] == ""
     assert card["orphanet_id"] == "ORPHA:484"
+
+
+def test_final_synthesizer_uses_canonical_ranking_not_llm_card_order():
+    class FakeReasoner:
+        def complete(self, system_prompt, user_prompt, *, temperature=None, seed=42):
+            return (
+                '{"summary":"...","diagnosis_cards":['
+                '{'
+                '"disease_name_zh":"妊娠滋养细胞疾病",'
+                '"disease_name_en":"Gestational trophoblastic disease",'
+                '"clinical_diagnosis":"Gestational trophoblastic disease",'
+                '"support_level":"高",'
+                '"confidence":0.95,'
+                '"inheritance":"NA",'
+                '"disease_genes":[],'
+                '"molecular_mechanism":"NA",'
+                '"pathogenesis":"NA",'
+                '"specialties":["妇科"],'
+                '"supporting_evidence":["广义疾病谱支持"],'
+                '"contradicting_evidence":[],'
+                '"missing_evidence":[],'
+                '"recommended_tests":[],'
+                '"references":[],'
+                '"cautions":[]'
+                '},'
+                '{'
+                '"disease_name_zh":"家族性复发性葡萄胎",'
+                '"disease_name_en":"Familial recurrent hydatidiform mole",'
+                '"clinical_diagnosis":"Familial recurrent hydatidiform mole",'
+                '"support_level":"中",'
+                '"confidence":0.70,'
+                '"inheritance":"常染色体隐性遗传",'
+                '"disease_genes":["NLRP7","KHDC3L"],'
+                '"molecular_mechanism":"NA",'
+                '"pathogenesis":"NA",'
+                '"specialties":["生殖遗传"],'
+                '"supporting_evidence":["表型高度吻合"],'
+                '"contradicting_evidence":[],'
+                '"missing_evidence":["待基因检测"],'
+                '"recommended_tests":["基因检测"],'
+                '"references":[],'
+                '"cautions":[]'
+                '}],'
+                '"next_steps":["..."],'
+                '"cautions":[]}'
+            )
+
+    synthesizer = LlmFinalDiagnosisSynthesizer(api_key="demo", model_name="demo")
+    synthesizer._reasoner = FakeReasoner()
+
+    recommendation = synthesizer.synthesize(
+        patient=PatientProfile(patient_id="case-frhm", raw_note="两次葡萄胎妊娠，不孕。"),
+        phenotypes=[
+            PhenotypeItem(label="Hydatidiform mole", code="HP:0032192"),
+            PhenotypeItem(label="Infertility", code="HP:0000789"),
+        ],
+        phenotype_hints=[],
+        knowledge_evidence=[],
+        similar_cases=[],
+        initial_candidates=[
+            CandidateCondition(
+                name="Familial recurrent hydatidiform mole",
+                rank=1,
+                score=0.95,
+                rationale="Direct phenotype fit.",
+            ),
+            CandidateCondition(
+                name="Gestational trophoblastic disease",
+                rank=2,
+                score=0.55,
+                rationale="Broader disease spectrum.",
+            ),
+        ],
+        normalized_candidates=[],
+        reviews=[
+            CandidateReview("Familial recurrent hydatidiform mole", True, confidence=0.90),
+            CandidateReview("Gestational trophoblastic disease", True, confidence=0.60),
+        ],
+    )
+
+    assert recommendation.diagnosis_cards[0]["clinical_diagnosis"] == "Familial recurrent hydatidiform mole"
+    assert recommendation.diagnosis_cards[0]["rank"] == 1
+    assert recommendation.diagnosis_cards[0]["diagnosis_match_percent"] >= recommendation.diagnosis_cards[1]["diagnosis_match_percent"]
+
+
+def test_final_synthesizer_localizes_english_diagnosis_titles_to_chinese():
+    class FakeReasoner:
+        def complete(self, system_prompt, user_prompt, *, temperature=None, seed=42):
+            if "整理疾病展示名" in system_prompt:
+                return (
+                    '{"cards":['
+                    '{"index":0,"disease_name_zh":"家族性复发性葡萄胎","disease_name_en":"Hydatidiform mole"},'
+                    '{"index":1,"disease_name_zh":"复发性妊娠滋养细胞疾病","disease_name_en":"Gestational trophoblastic disease"}'
+                    ']}'
+                )
+            return (
+                '{"summary":"...","diagnosis_cards":['
+                '{'
+                '"disease_name_zh":"Recurrent Hydatidiform Mole, Autosomal Recessive",'
+                '"disease_name_en":"Hydatidiform mole",'
+                '"clinical_diagnosis":"Recurrent Hydatidiform Mole, Autosomal Recessive",'
+                '"support_level":"中",'
+                '"confidence":0.85,'
+                '"inheritance":"常染色体隐性遗传",'
+                '"disease_genes":["NLRP7","KHDC3L"],'
+                '"molecular_mechanism":"NA",'
+                '"pathogenesis":"NA",'
+                '"specialties":["生殖遗传"],'
+                '"supporting_evidence":["表型高度吻合"],'
+                '"contradicting_evidence":[],'
+                '"missing_evidence":["待基因检测"],'
+                '"recommended_tests":["基因检测"],'
+                '"references":[],'
+                '"cautions":[]'
+                '},'
+                '{'
+                '"disease_name_zh":"Gestational Trophoblastic Disease, Recurrent",'
+                '"disease_name_en":"Gestational trophoblastic disease",'
+                '"clinical_diagnosis":"Gestational trophoblastic disease",'
+                '"support_level":"中",'
+                '"confidence":0.75,'
+                '"inheritance":"NA",'
+                '"disease_genes":[],'
+                '"molecular_mechanism":"NA",'
+                '"pathogenesis":"NA",'
+                '"specialties":["妇科"],'
+                '"supporting_evidence":["广义疾病谱支持"],'
+                '"contradicting_evidence":[],'
+                '"missing_evidence":[],'
+                '"recommended_tests":[],'
+                '"references":[],'
+                '"cautions":[]'
+                '}],'
+                '"next_steps":["..."],'
+                '"cautions":[]}'
+            )
+
+    synthesizer = LlmFinalDiagnosisSynthesizer(api_key="demo", model_name="demo")
+    synthesizer._reasoner = FakeReasoner()
+
+    recommendation = synthesizer.synthesize(
+        patient=PatientProfile(patient_id="case-zh-name", raw_note="两次葡萄胎妊娠，不孕。"),
+        phenotypes=[
+            PhenotypeItem(label="Hydatidiform mole", code="HP:0032192"),
+            PhenotypeItem(label="Infertility", code="HP:0000789"),
+        ],
+        phenotype_hints=[],
+        knowledge_evidence=[],
+        similar_cases=[],
+        initial_candidates=[
+            CandidateCondition(
+                name="Recurrent Hydatidiform Mole, Autosomal Recessive",
+                rank=1,
+                score=0.95,
+                rationale="Direct phenotype fit.",
+            ),
+            CandidateCondition(
+                name="Gestational Trophoblastic Disease, Recurrent",
+                rank=2,
+                score=0.60,
+                rationale="Broader disease spectrum.",
+            ),
+        ],
+        normalized_candidates=[
+            NormalizedDisease(
+                original_name="Recurrent Hydatidiform Mole, Autosomal Recessive",
+                normalized_name="Hydatidiform mole",
+                disease_id="ORPHA:99927",
+                ontology="Orphanet/OMIM:OMIM:231090",
+                normalization_decision_confidence=0.85,
+            ),
+            NormalizedDisease(
+                original_name="Gestational Trophoblastic Disease, Recurrent",
+                normalized_name="Gestational trophoblastic disease",
+                disease_id="ORPHA:254685",
+                ontology="Orphanet",
+                normalization_decision_confidence=0.74,
+            ),
+        ],
+        reviews=[
+            CandidateReview("Hydatidiform mole", True, confidence=0.85),
+            CandidateReview("Gestational trophoblastic disease", True, confidence=0.75),
+        ],
+    )
+
+    assert recommendation.diagnosis_cards[0]["disease_name_zh"] == "家族性复发性葡萄胎"
+    assert recommendation.diagnosis_cards[0]["disease_name_en"] == "Hydatidiform mole"
+    assert recommendation.diagnosis_cards[1]["disease_name_zh"] == "复发性妊娠滋养细胞疾病"
+
+
+def test_final_synthesizer_localizes_fallback_cards_when_final_json_is_invalid():
+    class FakeReasoner:
+        def complete(self, system_prompt, user_prompt, *, temperature=None, seed=42):
+            if "整理疾病展示名" in system_prompt:
+                return (
+                    '{"cards":['
+                    '{"index":0,"disease_name_zh":"复发性葡萄胎","disease_name_en":"Hydatidiform mole"}'
+                    ']}'
+                )
+            return "Request timed out."
+
+    synthesizer = LlmFinalDiagnosisSynthesizer(api_key="demo", model_name="demo")
+    synthesizer._reasoner = FakeReasoner()
+
+    recommendation = synthesizer.synthesize(
+        patient=PatientProfile(patient_id="case-fallback-zh", raw_note="两次葡萄胎妊娠，不孕。"),
+        phenotypes=[PhenotypeItem(label="Hydatidiform mole", code="HP:0032192")],
+        phenotype_hints=[],
+        knowledge_evidence=[],
+        similar_cases=[],
+        initial_candidates=[
+            CandidateCondition(
+                name="Recurrent Hydatidiform Mole",
+                rank=1,
+                score=0.95,
+                rationale="Direct phenotype fit.",
+            )
+        ],
+        normalized_candidates=[
+            NormalizedDisease(
+                original_name="Recurrent Hydatidiform Mole",
+                normalized_name="Hydatidiform mole",
+                disease_id="ORPHA:99927",
+                ontology="Orphanet/OMIM:OMIM:231090",
+                normalization_decision_confidence=0.77,
+            )
+        ],
+        reviews=[CandidateReview("Hydatidiform mole", True, confidence=0.85)],
+    )
+
+    assert recommendation.summary.startswith("Clinical MVP 已按 DeepRare 风格完成一轮可追溯鉴别诊断")
+    assert recommendation.diagnosis_cards[0]["disease_name_zh"] == "复发性葡萄胎"
+    assert recommendation.diagnosis_cards[0]["disease_name_en"] == "Hydatidiform mole"
 
 
 def test_unconfirmed_molecular_candidate_name_is_softened_without_patient_variant():
@@ -693,6 +930,9 @@ def test_final_synthesis_sorts_candidates_by_normalized_review_mapping():
     )
 
     assert recommendation.candidates[0].name == "Recurrent hydatidiform mole"
+    assert recommendation.diagnosis_cards[0]["clinical_diagnosis"] == "Recurrent hydatidiform mole"
+    assert recommendation.diagnosis_cards[0]["confidence"] == 0.9
+    assert "复核置信度=0.90" in recommendation.diagnosis_cards[0]["ranking_reason"]
 
 
 def test_local_disease_normalizer_uses_deeprare_style_top1_recall(monkeypatch):

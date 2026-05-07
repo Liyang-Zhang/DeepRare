@@ -142,11 +142,15 @@ class DiagnosisCardReferenceResponse(BaseModel):
 
 
 class DiagnosisCardResponse(BaseModel):
+    rank: int = 0
+    diagnosis_match_score: float = 0.0
+    diagnosis_match_percent: int = 0
     disease_name_zh: str = ""
     disease_name_en: str = ""
     clinical_diagnosis: str = ""
     support_level: str = "中"
     confidence: float = 0.0
+    ranking_reason: str = ""
     omim_id: str = "NA"
     omim_url: str = ""
     orphanet_id: str = "NA"
@@ -171,6 +175,8 @@ class FinalRecommendationResponse(BaseModel):
     reviews: list[Any] = Field(default_factory=list)
     next_steps: list[str] = Field(default_factory=list)
     cautions: list[str] = Field(default_factory=list)
+    final_diagnosis_confidence: float = 0.0
+    final_diagnosis_confidence_percent: int = 0
     diagnosis_cards: list[DiagnosisCardResponse] = Field(default_factory=list)
 
 

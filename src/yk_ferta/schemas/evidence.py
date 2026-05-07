@@ -45,4 +45,6 @@ class TraceableRecommendation:
     reviews: list[CandidateReview]
     next_steps: list[str] = field(default_factory=list)
     cautions: list[str] = field(default_factory=list)
+    final_diagnosis_confidence: float = 0.0
+    final_diagnosis_confidence_percent: int = 0
     diagnosis_cards: list[dict[str, object]] = field(default_factory=list)
