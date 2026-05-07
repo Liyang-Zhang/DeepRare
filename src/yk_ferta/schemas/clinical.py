@@ -40,6 +40,7 @@ class PhenotypeItem:
     """Normalized phenotype representation."""
 
     label: str
+    chinese_label: str = ""
     code: str | None = None
     source: str = ""
     confidence: float | None = None

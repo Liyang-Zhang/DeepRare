@@ -863,6 +863,22 @@
       return "";
     }
 
+    function phenotypePrimaryName(item) {
+      return item?.chinese_label || item?.label || "-";
+    }
+
+    function phenotypeSecondaryName(item) {
+      const chinese = item?.chinese_label || "";
+      const english = item?.label || "";
+      if (chinese && english && chinese !== english) return english;
+      return "";
+    }
+
+    function phenotypeDisplay(item) {
+      const primary = phenotypePrimaryName(item);
+      return item?.code ? `${primary}（${item.code}）` : primary;
+    }
+
     function renderTable(headers, rows) {
       return `
         <div style="overflow:auto;">
@@ -884,7 +900,7 @@
       if (type === "hpo") {
         const rows = (data.phenotypes || []).map((item) => `
           <tr>
-            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.label || "-")}</td>
+            <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(phenotypePrimaryName(item))}${phenotypeSecondaryName(item) ? `<br><span class="muted">${escapeHtml(phenotypeSecondaryName(item))}</span>` : ""}</td>
             <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.code || "-")}</td>
             <td style="padding:8px; border-bottom:1px solid #eef3f8;">${escapeHtml(item.source || "-")}</td>
             <td style="padding:8px; border-bottom:1px solid #eef3f8;">${scoreText(item.confidence)}</td>
@@ -1060,8 +1076,8 @@
       $("workflowSummary").innerHTML = `
         <div class="stage-card">
           <h4>1. HPO 表型确认</h4>
-          <p>已确认 ${phenotypes.length} 个表型。${phenotypes.slice(0, 5).map((item) => item.label).join(" / ") || "尚无返回"}</p>
-          <div class="chips">${phenotypes.slice(0, 6).map((item) => `<span class="tag">${escapeHtml(item.code || item.label || "-")}</span>`).join("")}</div>
+          <p>已确认 ${phenotypes.length} 个表型。${phenotypes.slice(0, 5).map((item) => phenotypeDisplay(item)).join(" / ") || "尚无返回"}</p>
+          <div class="chips">${phenotypes.slice(0, 6).map((item) => `<span class="tag">${escapeHtml(item.code || phenotypePrimaryName(item) || "-")}</span>`).join("")}</div>
         </div>
         <div class="stage-card">
           <h4>2. 表型工具分析</h4>
@@ -1127,7 +1143,7 @@
         : (topCandidate?.name || normalizedCandidates[0]?.normalized_name || "-");
       const diseaseGenes = compactList(topDiagnosisCard?.disease_genes || []);
 
-      const topPhenotypes = phenotypes.map((item) => `${item.label || "-"}${item.code ? ` (${item.code})` : ""}`).join("、");
+      const topPhenotypes = phenotypes.map((item) => phenotypeDisplay(item)).join("、");
       const toolSummary = toolRuns.map((item) => `${item.source}:${item.status}`).join(" / ");
 
       const evidenceRows = evidence.slice(0, 8).map((item) => `
@@ -1291,7 +1307,7 @@
       const finalRecommendation = response.final_recommendation || {};
       const diagnosisCards = finalRecommendation.diagnosis_cards || [];
 
-      const hpoRows = phenotypes.map((item) => `<tr><td>${escapeHtml(item.label || "-")}</td><td>${escapeHtml(item.code || "-")}</td><td>${escapeHtml(item.source || "-")}</td><td>${item.confidence !== null && item.confidence !== undefined ? Number(item.confidence).toFixed(3) : "-"}</td><td>${escapeHtml(item.notes || "-")}</td></tr>`).join("");
+      const hpoRows = phenotypes.map((item) => `<tr><td>${escapeHtml(phenotypePrimaryName(item))}${phenotypeSecondaryName(item) ? `<br><span class="muted">${escapeHtml(phenotypeSecondaryName(item))}</span>` : ""}</td><td>${escapeHtml(item.code || "-")}</td><td>${escapeHtml(item.source || "-")}</td><td>${item.confidence !== null && item.confidence !== undefined ? Number(item.confidence).toFixed(3) : "-"}</td><td>${escapeHtml(item.notes || "-")}</td></tr>`).join("");
       const toolRows = toolRuns.map((item) => `<tr><td>${escapeHtml(item.source || "-")}</td><td>${badge(item.status === "success" ? "成功" : item.status === "failed" ? "失败" : "跳过", item.status === "success" ? "ok" : item.status === "failed" ? "bad" : "warn")}</td><td>${escapeHtml((item.query || []).join(", ") || "-")}</td><td>${(item.parsed_candidates || []).map((candidate) => escapeHtml(candidate.disease_name)).slice(0, 5).join("<br>") || "-"}</td><td>${escapeHtml(item.error || "-")}</td></tr>`).join("");
       const evidenceItems = evidence.slice(0, 8).map((item) => `<div class="evidence-item"><div class="title">${escapeHtml(item.title || item.source_id || "-")}</div><div class="meta-line">${escapeHtml(sourceLabel(item.source_type))} · ${escapeHtml(item.source_id || "-")} ${item.url ? `· <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">查看来源</a>` : ""}</div><div class="compact-text">${escapeHtml(item.summary || "-")}</div></div>`).join("");
       const caseRows = similarCases.map((item) => {

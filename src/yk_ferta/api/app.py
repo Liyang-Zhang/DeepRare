@@ -116,6 +116,7 @@ def _extract_hpo_response(patient_payload: dict, config_path: str) -> HpoExtract
         phenotypes=[
             ManualPhenotype(
                 label=item.label,
+                chinese_label=item.chinese_label,
                 code=item.code,
                 source=item.source,
                 confidence=item.confidence,

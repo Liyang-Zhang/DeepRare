@@ -133,6 +133,7 @@ class ClinicalMvpTaskRunner:
                     manual_phenotypes.append(
                         PhenotypeItem(
                             label=label,
+                            chinese_label=str(item.get("chinese_label") or "").strip(),
                             code=item.get("code"),
                             source=item.get("source") or "task-manual",
                             confidence=item.get("confidence", 1.0),

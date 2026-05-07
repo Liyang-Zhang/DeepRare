@@ -1040,12 +1040,14 @@
     }
 
     function hpoKey(item) {
-      return `${item.code || ""}::${item.label || ""}`.toLowerCase();
+      if (item.code) return String(item.code).toLowerCase();
+      return `${item.label || ""}`.toLowerCase();
     }
 
     function addHpo(item, checked = true) {
       const normalized = {
         label: item.label,
+        chinese_label: item.chinese_label || "",
         code: item.code || null,
         source: item.source || "manual-review",
         confidence: item.confidence ?? 1.0,
@@ -1067,7 +1069,8 @@
         <div class="hpo-item">
           <input type="checkbox" data-hpo-toggle="${index}" ${item.checked ? "checked" : ""}>
           <div>
-            <div class="title">${escapeHtml(item.label)} ${item.code ? `<span style="color:var(--accent);">${escapeHtml(item.code)}</span>` : ""}</div>
+            <div class="title">${escapeHtml(phenotypePrimaryName(item))} ${item.code ? `<span style="color:var(--accent);">${escapeHtml(item.code)}</span>` : ""}</div>
+            ${phenotypeSecondaryName(item) ? `<div class="sub">${escapeHtml(phenotypeSecondaryName(item))}</div>` : ""}
             <div class="sub">${escapeHtml(item.source || "-")}${item.confidence ? ` · ${Number(item.confidence).toFixed(3)}` : ""}${item.notes ? ` · ${escapeHtml(item.notes)}` : ""}</div>
           </div>
           <button data-hpo-remove="${index}">删除</button>
@@ -1142,6 +1145,22 @@
     function compactList(value) {
       if (!Array.isArray(value) || !value.length) return "-";
       return value.filter(Boolean).join("、") || "-";
+    }
+
+    function phenotypePrimaryName(item) {
+      return item?.chinese_label || item?.label || "-";
+    }
+
+    function phenotypeSecondaryName(item) {
+      const chinese = item?.chinese_label || "";
+      const english = item?.label || "";
+      if (chinese && english && chinese !== english) return english;
+      return "";
+    }
+
+    function phenotypeDisplay(item) {
+      const primary = phenotypePrimaryName(item);
+      return item?.code ? `${primary}（${item.code}）` : primary;
     }
 
     function referenceLinks(references) {
@@ -1229,7 +1248,8 @@
 
       const hpoCards = phenotypes.map((item) => `
         <div class="info-card">
-          <h4>${escapeHtml(item.label || "-")} ${item.code ? badge(item.code) : ""}</h4>
+          <h4>${escapeHtml(phenotypePrimaryName(item))} ${item.code ? badge(item.code) : ""}</h4>
+          ${phenotypeSecondaryName(item) ? `<div class="muted" style="margin-bottom:6px;">${escapeHtml(phenotypeSecondaryName(item))}</div>` : ""}
           <div class="muted">来源：${escapeHtml(item.source || "-")} · 置信度：${item.confidence !== null && item.confidence !== undefined ? Number(item.confidence).toFixed(3) : "-"}</div>
           <div class="muted">${escapeHtml(item.notes || "")}</div>
         </div>
@@ -1347,7 +1367,7 @@
           <section class="reasoning-section">
             <header><h3>1. HPO 表型分析</h3><span class="hint">${phenotypes.length} 个确认表型</span></header>
             <div class="body">
-              <div class="compact-text" style="margin-bottom:10px;">后续推理基于已确认 HPO：${escapeHtml(phenotypes.map((item) => item.label).join(" + ") || "-")}。</div>
+              <div class="compact-text" style="margin-bottom:10px;">后续推理基于已确认 HPO：${escapeHtml(phenotypes.map((item) => phenotypeDisplay(item)).join(" + ") || "-")}。</div>
               <div class="card-grid">${hpoCards || "<div class='compact-text'>-</div>"}</div>
             </div>
           </section>
@@ -1413,7 +1433,7 @@
 
       const hpoRows = phenotypes.map((item) => `
         <tr>
-          <td>${escapeHtml(item.label || "-")}</td>
+          <td>${escapeHtml(phenotypePrimaryName(item))}${phenotypeSecondaryName(item) ? `<br><span class="hint">${escapeHtml(phenotypeSecondaryName(item))}</span>` : ""}</td>
           <td>${escapeHtml(item.code || "-")}</td>
           <td>${escapeHtml(item.source || "-")}</td>
           <td>${item.confidence !== null && item.confidence !== undefined ? Number(item.confidence).toFixed(3) : "-"}</td>
@@ -1578,8 +1598,8 @@
       ui.hpoSearchResults.innerHTML = (result.hits || []).map((item, index) => `
         <div class="search-hit">
           <div>
-            <strong>${escapeHtml(item.label)}</strong> <span style="color:var(--accent);">${escapeHtml(item.code)}</span>
-            <div style="color:var(--muted);font-size:12px;">${escapeHtml(item.chinese_label || "")} · ${escapeHtml(item.source || "")}</div>
+            <strong>${escapeHtml(item.chinese_label || item.label || "-")}</strong> <span style="color:var(--accent);">${escapeHtml(item.code)}</span>
+            <div style="color:var(--muted);font-size:12px;">${escapeHtml(item.label || "")} · ${escapeHtml(item.source || "")}</div>
           </div>
           <button data-hpo-add="${index}">添加</button>
         </div>
@@ -1589,10 +1609,11 @@
           const item = result.hits[Number(node.dataset.hpoAdd)];
           addHpo({
             label: item.label,
+            chinese_label: item.chinese_label || "",
             code: item.code,
             source: "manual-hpo-search",
             confidence: 1.0,
-            notes: item.chinese_label,
+            notes: "",
           }, true);
         });
       });
@@ -1608,6 +1629,7 @@
         patient_payload: patientPayload(),
         manual_phenotypes: reviewedHpos.filter((item) => item.checked).map((item) => ({
           label: item.label,
+          chinese_label: item.chinese_label || "",
           code: item.code,
           source: item.source || "manual-review",
           confidence: item.confidence ?? 1.0,

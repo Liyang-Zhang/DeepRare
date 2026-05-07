@@ -186,16 +186,18 @@ def test_task_api_accepts_reviewed_hpo_objects(tmp_path):
             "manual_phenotypes": [
                 {
                     "label": "Hydatidiform mole",
+                    "chinese_label": "葡萄胎",
                     "code": "HP:0032192",
                     "source": "manual-review",
                     "confidence": 1.0,
-                    "notes": "葡萄胎",
+                    "notes": "",
                 }
             ],
         },
     )
     assert case_resp.status_code == 200
     assert case_resp.json()["manual_phenotypes"][0]["code"] == "HP:0032192"
+    assert case_resp.json()["manual_phenotypes"][0]["chinese_label"] == "葡萄胎"
 
     task_id = client.post(
         "/api/v1/tasks",
@@ -213,6 +215,7 @@ def test_task_api_accepts_reviewed_hpo_objects(tmp_path):
     assert terminal["status"] == "completed"
     result = client.get(f"/api/v1/tasks/{task_id}/result").json()["response"]
     assert result["phenotypes"][0]["code"] == "HP:0032192"
+    assert result["phenotypes"][0]["chinese_label"] == "葡萄胎"
 
 
 def test_create_case_returns_409_when_case_id_already_exists(tmp_path):
@@ -435,6 +438,8 @@ def test_hpo_search_endpoint_returns_local_catalog_hits(tmp_path):
     assert response.status_code == 200
     hits = response.json()["hits"]
     assert any(item["code"] == "HP:0032192" for item in hits)
+    target = next(item for item in hits if item["code"] == "HP:0032192")
+    assert target["chinese_label"]
 
 
 def test_hpo_extract_endpoint_uses_configured_extractor(tmp_path):

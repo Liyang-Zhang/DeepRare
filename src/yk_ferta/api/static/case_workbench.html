@@ -319,17 +319,29 @@
     }
 
     function addHpo(item) {
-      const key = `${item.code || ""}|${item.label || ""}`.toLowerCase();
+      const key = String(item.code || item.label || "").toLowerCase();
       if (!key.trim()) return;
-      if (confirmedHpo.some((h) => `${h.code || ""}|${h.label || ""}`.toLowerCase() === key)) return;
+      if (confirmedHpo.some((h) => String(h.code || h.label || "").toLowerCase() === key)) return;
       confirmedHpo.push({
         label: item.label || "",
+        chinese_label: item.chinese_label || "",
         code: item.code || null,
         source: item.source || "manual-review",
         confidence: item.confidence ?? 1.0,
         notes: item.notes || ""
       });
       renderHpoList();
+    }
+
+    function phenotypePrimaryName(item) {
+      return item?.chinese_label || item?.label || "-";
+    }
+
+    function phenotypeSecondaryName(item) {
+      const chinese = item?.chinese_label || "";
+      const english = item?.label || "";
+      if (chinese && english && chinese !== english) return english;
+      return "";
     }
 
     function removeHpo(index) {
@@ -346,8 +358,9 @@
       box.innerHTML = confirmedHpo.map((item, idx) => `
         <div class="hpo-row">
           <div>
-            <strong>${escapeHtml(item.label)}</strong>
+            <strong>${escapeHtml(phenotypePrimaryName(item))}</strong>
             ${item.code ? `<span class="chip">${escapeHtml(item.code)}</span>` : ""}
+            ${phenotypeSecondaryName(item) ? `<div class="muted">${escapeHtml(phenotypeSecondaryName(item))}</div>` : ""}
             <div class="muted">source=${escapeHtml(item.source || "-")} confidence=${item.confidence ?? "-"}</div>
           </div>
           <button class="secondary" data-remove="${idx}">移除</button>

@@ -110,6 +110,7 @@ def test_rag_hpo_result_can_be_mapped_to_phenotype_items():
 
     assert len(phenotypes) == 1
     assert phenotypes[0].label == "Hydatidiform mole"
+    assert phenotypes[0].chinese_label == "葡萄胎"
     assert phenotypes[0].code == "HP:0032192"
     assert phenotypes[0].source == "rag-hpo-service"
 

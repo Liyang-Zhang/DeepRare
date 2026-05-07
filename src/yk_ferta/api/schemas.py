@@ -20,6 +20,7 @@ class ErrorResponse(BaseModel):
 
 class ManualPhenotype(BaseModel):
     label: str
+    chinese_label: str = ""
     code: str | None = None
     source: str = "manual-review"
     confidence: float | None = 1.0

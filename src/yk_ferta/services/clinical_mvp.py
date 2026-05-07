@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from yk_ferta.schemas.clinical import CandidateCondition, PatientProfile, PhenotypeItem
 from yk_ferta.schemas.evidence import CandidateReview, EvidenceItem, TraceableRecommendation
 from yk_ferta.schemas.mvp import NormalizedDisease, PhenotypeToolHit, PhenotypeToolRun, SimilarCase
+from yk_ferta.services.hpo_catalog import lookup_hpo_catalog
 
 
 def _safe_json_loads(text: str) -> object | None:
@@ -294,13 +295,24 @@ class RagHpoPhenotypeExtractor:
             if person.get("person_role") != "self":
                 continue
             for item in person.get("phenotypes") or []:
-                label = item.get("hpo_name") or item.get("chpo_name") or item.get("phenotype_name")
-                if not label:
+                catalog_entry = lookup_hpo_catalog(
+                    code=item.get("hpo_id"),
+                    label=item.get("hpo_name") or item.get("chpo_name") or item.get("phenotype_name"),
+                )
+                label = (
+                    item.get("hpo_name")
+                    or (catalog_entry.label if catalog_entry else "")
+                    or item.get("chpo_name")
+                    or item.get("phenotype_name")
+                )
+                chinese_label = item.get("chpo_name") or (catalog_entry.chinese_label if catalog_entry else "")
+                if not label and not chinese_label:
                     continue
                 notes_parts = [part for part in [item.get("phenotype_name"), item.get("parse_reason")] if part]
                 phenotypes.append(
                     PhenotypeItem(
-                        label=str(label),
+                        label=str(label or chinese_label),
+                        chinese_label=str(chinese_label or ""),
                         code=item.get("hpo_id"),
                         source="rag-hpo-service",
                         confidence=_safe_float(item.get("similarity"), default=0.0) or None,

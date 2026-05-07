@@ -60,6 +60,43 @@ def load_hpo_catalog(
     return list(entries.values())
 
 
+@lru_cache(maxsize=1)
+def _hpo_catalog_index(
+    chpo_path: str = "database/CHPO-2025-4.xlsx",
+    phenotype_mapping_path: str = "database/phenotype_mapping.json",
+) -> tuple[dict[str, HpoCatalogEntry], dict[str, HpoCatalogEntry]]:
+    code_index: dict[str, HpoCatalogEntry] = {}
+    label_index: dict[str, HpoCatalogEntry] = {}
+    for entry in load_hpo_catalog(chpo_path=chpo_path, phenotype_mapping_path=phenotype_mapping_path):
+        code_index[entry.code] = entry
+        for key in {entry.label, entry.chinese_label}:
+            normalized = _norm(key)
+            if normalized and normalized not in label_index:
+                label_index[normalized] = entry
+    return code_index, label_index
+
+
+def lookup_hpo_catalog(
+    code: str | None = None,
+    label: str | None = None,
+    *,
+    chpo_path: str = "database/CHPO-2025-4.xlsx",
+    phenotype_mapping_path: str = "database/phenotype_mapping.json",
+) -> HpoCatalogEntry | None:
+    code_index, label_index = _hpo_catalog_index(
+        chpo_path=chpo_path,
+        phenotype_mapping_path=phenotype_mapping_path,
+    )
+    if code:
+        matched = code_index.get(str(code).strip())
+        if matched is not None:
+            return matched
+    normalized = _norm(label or "")
+    if not normalized:
+        return None
+    return label_index.get(normalized)
+
+
 def search_hpo_catalog(query: str, *, limit: int = 20) -> list[HpoCatalogEntry]:
     query = _norm(query)
     if not query:
