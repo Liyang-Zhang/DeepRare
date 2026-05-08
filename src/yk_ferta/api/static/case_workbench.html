@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>yk-FERTA 病例录入与表型确认</title>
+  <title>亿康不孕不育辅助诊断智能体 · 病例录入与表型确认</title>
   <style>
     :root {
       --bg: #f2f6f4;
@@ -179,7 +179,7 @@
 <body>
   <div class="wrap">
     <section class="hero">
-      <h1>yk-FERTA 病例录入与表型确认</h1>
+      <h1>亿康不孕不育辅助诊断智能体</h1>
       <p>用于录入病例信息、确认 HPO 表型，并发起后续诊断分析。</p>
     </section>
 
@@ -191,30 +191,16 @@
       </form>
     </div>
 
-    <section class="panel">
-      <header>连接配置</header>
-      <div class="panel-body grid">
-        <label>
-          API Base URL
-          <input id="baseUrl" value="" placeholder="默认使用当前站点">
-        </label>
-      </div>
-    </section>
+    <input id="baseUrl" type="hidden" value="">
 
     <section class="panel">
       <header>病例输入</header>
       <div class="panel-body grid">
-        <label>
-          病例ID（可选）
-          <input id="caseId" placeholder="留空将自动生成">
-        </label>
-        <label>
-          患者ID（可选）
-          <input id="patientId" placeholder="留空将沿用 case_id 或自动生成">
-        </label>
+        <input id="caseId" type="hidden" value="">
+        <input id="patientId" type="hidden" value="">
         <label>
           主诉
-          <input id="chiefComplaint" value="不孕不育">
+          <textarea id="chiefComplaint" style="min-height:72px;">不孕不育</textarea>
         </label>
         <label>
           Top-K

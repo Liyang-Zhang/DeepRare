@@ -165,7 +165,7 @@ def _render_login_page(next_path: str, error_message: str = "") -> HTMLResponse:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>yk-FERTA 登录</title>
+  <title>亿康不孕不育辅助诊断智能体登录</title>
   <style>
     :root {{
       color-scheme: light;
@@ -191,14 +191,26 @@ def _render_login_page(next_path: str, error_message: str = "") -> HTMLResponse:
       font-family: "Segoe UI", "PingFang SC", "Helvetica Neue", sans-serif;
     }}
     .panel {{
-      width: min(420px, calc(100vw - 32px));
+      width: min(480px, calc(100vw - 32px));
       background: var(--card);
       border: 1px solid var(--line);
       border-radius: 20px;
       padding: 28px;
       box-shadow: 0 24px 64px rgba(17, 34, 51, 0.12);
     }}
-    h1 {{ margin: 0 0 8px; font-size: 28px; }}
+    .eyebrow {{
+      margin: 0 0 8px;
+      color: var(--accent-strong);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }}
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.2;
+      word-break: keep-all;
+    }}
     p {{ margin: 0 0 18px; color: var(--muted); line-height: 1.5; }}
     label {{ display: block; margin: 14px 0 6px; font-size: 14px; color: var(--muted); }}
     input {{
@@ -242,8 +254,9 @@ def _render_login_page(next_path: str, error_message: str = "") -> HTMLResponse:
 </head>
 <body>
   <main class="panel">
-    <h1>yk-FERTA</h1>
-    <p>内网调试面板登录。登录后可访问病例录入、任务执行、结果查看与追溯页面。</p>
+    <div class="eyebrow">亿康不孕不育辅助诊断智能体</div>
+    <h1>智能体登录</h1>
+    <p>登录后可访问病例录入、任务执行、结果查看与追溯页面。</p>
     {error_block}
     <form method="post" action="/login">
       <input type="hidden" name="next" value="{escaped_next}">
@@ -363,10 +376,10 @@ def create_app(
     startup_config = ClinicalMvpConfig.load(default_config_path)
     auth_config = startup_config.auth
     app = FastAPI(
-        title="yk-FERTA API",
+        title="亿康不孕不育辅助诊断智能体 API",
         version="0.1.0",
         description=(
-            "yk-FERTA 核心智能体服务接口。\n\n"
+            "亿康不孕不育辅助诊断智能体服务接口。\n\n"
             "用途：病例创建、任务执行、SSE 进度订阅、结果获取、追溯 artifact 查询。\n\n"
             "说明：`/api/v1/tasks/{task_id}/result` 是正式前端主消费接口；"
             "`/artifacts` 主要用于追溯与调试。"

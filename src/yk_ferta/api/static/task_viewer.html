@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>yk-FERTA 诊断结果</title>
+  <title>亿康不孕不育辅助诊断智能体 · 诊断结果</title>
   <style>
     :root {
       --bg: #f2f6f4;
@@ -659,7 +659,7 @@
 <body>
   <div class="wrap">
     <section class="hero">
-      <h1>yk-FERTA 诊断结果</h1>
+      <h1>亿康不孕不育辅助诊断智能体</h1>
       <p>用于查看分析进度、诊断建议、依据说明与后续建议，支持临床复核与过程追踪。</p>
     </section>
 
@@ -1465,11 +1465,11 @@
             false
           )}
           ${renderCollapsibleSection(
-            "3. 五种可能诊断及支持度",
+            "3. 候选诊断",
             `${initialCandidates.length} 个候选`,
             `
               <div class="info-card">
-                ${renderTable(["可能诊断", "支持度", "支持证据", "反对证据"], candidateRows)}
+                ${renderTable(["候选诊断", "支持度", "支持证据", "反对证据"], candidateRows)}
               </div>
             `,
             false
@@ -1620,7 +1620,7 @@
           "ok"
         );
         renderWorkflowSummary(response, timing);
-        renderDiagnosisCards(response, timing);
+        $("diagnosisCards").innerHTML = renderProductWorkflow(response, { timing });
         await refreshTaskMeta();
       } catch (err) {
         setStatus("resultSummary", `加载失败：${err.message}`, "bad");
