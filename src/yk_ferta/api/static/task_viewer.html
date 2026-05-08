@@ -392,6 +392,11 @@
       background: #fff;
       padding: 12px;
     }
+    .summary-metric.primary {
+      border-color: #b9dcc9;
+      background: linear-gradient(180deg, #ffffff, #edf7f1);
+      box-shadow: 0 10px 24px rgba(29, 107, 82, 0.08);
+    }
     .summary-metric .k {
       color: var(--muted);
       font-size: 12px;
@@ -404,6 +409,16 @@
       font-weight: 800;
       line-height: 1.35;
       word-break: break-word;
+    }
+    .summary-metric.primary .v {
+      font-size: 32px;
+      line-height: 1.1;
+    }
+    .summary-metric .sub {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.5;
     }
     .result-card .section-title {
       margin: 14px 0 8px;
@@ -453,7 +468,8 @@
       overflow: hidden;
       background: #fff;
     }
-    .reasoning-section > header {
+    .reasoning-section > header,
+    .reasoning-section > summary {
       display: flex;
       justify-content: space-between;
       gap: 10px;
@@ -461,6 +477,14 @@
       background: #f7fbf8;
       border-bottom: 1px solid var(--line);
       align-items: baseline;
+    }
+    .reasoning-section > summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .reasoning-section > summary::-webkit-details-marker { display: none; }
+    .reasoning-section:not([open]) > summary {
+      border-bottom: 0;
     }
     .reasoning-section h3 {
       margin: 0;
@@ -720,12 +744,14 @@
       <div class="panel-body">
         <div id="resultSummary" class="status muted">请输入任务编号后加载诊断结果。</div>
         <div id="diagnosisCards"></div>
-        <div id="traceabilityPanel"></div>
       </div>
     </section>
 
-    <section class="panel">
-      <header>过程资料</header>
+    <details class="panel collapsible-panel">
+      <summary>
+        <span>过程资料</span>
+        <span class="meta">按需展开查看结构化资料与审计细节</span>
+      </summary>
       <div class="panel-body">
         <div id="artifactStatus" class="status muted">尚未加载过程资料。</div>
         <div id="artifactList"></div>
@@ -733,7 +759,7 @@
           <div class="muted">点击上方资料类型后显示详情。</div>
         </div>
       </div>
-    </section>
+    </details>
   </div>
 
   <script>
@@ -1008,6 +1034,18 @@
       `;
     }
 
+    function renderCollapsibleSection(title, hint, body, open = false) {
+      return `
+        <details class="reasoning-section" ${open ? "open" : ""}>
+          <summary>
+            <h3>${escapeHtml(title)}</h3>
+            <span class="hint">${escapeHtml(hint)}</span>
+          </summary>
+          <div class="body">${body}</div>
+        </details>
+      `;
+    }
+
     function renderArtifactData(type, data) {
       if (!data || typeof data !== "object") {
         return `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
@@ -1103,11 +1141,12 @@
       if (type === "final_report" || type === "result") {
         const finalRec = data.final_recommendation || data.response?.final_recommendation || {};
         const cards = finalRec.diagnosis_cards || [];
+        const topCard = cards[0] || null;
         return `
           <div class="artifact-card" style="margin-bottom:10px;">
             <h4>最终摘要</h4>
             <p>${escapeHtml(productizeSummary(finalRec.summary || "-"))}</p>
-            <p>主诊断信心：${Number(finalRec.final_diagnosis_confidence_percent || 0) ? `${Number(finalRec.final_diagnosis_confidence_percent || 0)}%` : "-"}</p>
+            <p>诊断信心：${topCard?.diagnosis_match_percent !== undefined && topCard?.diagnosis_match_percent !== null ? `${Number(topCard.diagnosis_match_percent)}%` : "-"}</p>
           </div>
           ${cards.map((card, index) => `
             <div class="artifact-card" style="margin-bottom:10px;">
@@ -1236,7 +1275,6 @@
       const reviews = response.reviews || [];
       const finalRecommendation = response.final_recommendation || {};
       const diagnosisCards = finalRecommendation.diagnosis_cards || [];
-      const finalDiagnosisConfidencePercent = Number(finalRecommendation.final_diagnosis_confidence_percent || 0);
       const timing = result.timing || {};
       const supportedReviews = reviews.filter((item) => item.is_supported);
       const publicCases = similarCases.filter((item) => item.evidence_role === "diagnosis_reference");
@@ -1372,17 +1410,20 @@
                   ` : ""}
                 </div>
                 <div class="top-diagnosis-side">
-                  <div class="summary-metric">
-                    <div class="k">主诊断信心</div>
-                    <div class="v">${finalDiagnosisConfidencePercent ? `${finalDiagnosisConfidencePercent}%` : "-"}</div>
+                  <div class="summary-metric primary">
+                    <div class="k">诊断信心</div>
+                    <div class="v">${topMatchPercent ? `${topMatchPercent}%` : "-"}</div>
+                    <div class="sub">当前用于最终排序和展示的核心分数</div>
                   </div>
                   <div class="summary-metric">
-                    <div class="k">诊断信心 / 支持度</div>
-                    <div class="v">${topMatchPercent ? `${topMatchPercent}%` : "-"} · ${escapeHtml(topSupportLevel)}</div>
+                    <div class="k">支持度</div>
+                    <div class="v">${escapeHtml(topSupportLevel)}</div>
+                    <div class="sub">对现有证据支持强弱的定性分档</div>
                   </div>
                   <div class="summary-metric">
                     <div class="k">复核置信度</div>
                     <div class="v">${escapeHtml(String(topReviewConfidence))}</div>
+                    <div class="sub">单独复查该诊断时的吻合程度</div>
                   </div>
                   <div class="summary-metric">
                     <div class="k">致病基因 / 区域</div>
@@ -1392,27 +1433,26 @@
                     <div class="k">建议优先检查</div>
                     <div class="v">${escapeHtml(topRecommendedTests)}</div>
                   </div>
-                  <div class="summary-metric">
-                    <div class="k">复核支持</div>
-                    <div class="v">${supportedReviews.length} / ${reviews.length}</div>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <section class="reasoning-section">
-            <header><h3>1. 输入表型概览</h3><span class="hint">${phenotypes.length} 个确认表型</span></header>
-            <div class="body">
+          ${renderCollapsibleSection(
+            "1. 输入表型概览",
+            `${phenotypes.length} 个确认表型`,
+            `
               <div class="info-card">
                 <h4>已确认 HPO / 表型</h4>
                 <div class="compact-text">${escapeHtml(topPhenotypes || "-")}</div>
                 <div class="muted" style="margin-top:8px;">表型工具状态：${escapeHtml(toolSummary || "暂无")}</div>
               </div>
-            </div>
-          </section>
-          <section class="reasoning-section">
-            <header><h3>2. 资料检索</h3><span class="hint">医学文献与病例库证据</span></header>
-            <div class="body">
+            `,
+            false
+          )}
+          ${renderCollapsibleSection(
+            "2. 资料检索",
+            "医学文献与病例库证据",
+            `
               <div class="info-card" style="margin-bottom:12px;">
                 <h4>医学文献检索结果</h4>
                 ${renderTable(["资料来源", "主要发现", "相关性", "临床价值"], evidenceRows)}
@@ -1421,23 +1461,29 @@
                 ${caseGroupCard("公共病例库检索", publicCases, "ok")}
                 ${caseGroupCard("私有历史检测参考", privateCases, "warn", "私有历史检测案例只支持表型/检测经验参考，不等于确诊支持证据。")}
               </div>
-            </div>
-          </section>
-          <section class="reasoning-section">
-            <header><h3>3. 五种可能诊断及支持度</h3><span class="hint">${initialCandidates.length} 个候选</span></header>
-            <div class="body">
+            `,
+            false
+          )}
+          ${renderCollapsibleSection(
+            "3. 五种可能诊断及支持度",
+            `${initialCandidates.length} 个候选`,
+            `
               <div class="info-card">
                 ${renderTable(["可能诊断", "支持度", "支持证据", "反对证据"], candidateRows)}
               </div>
-            </div>
-          </section>
-          <section class="reasoning-section">
-            <header><h3>4. 反思判断</h3><span class="hint">逐候选复核</span></header>
-            <div class="body">${reviewCards || "<div class='compact-text'>-</div>"}</div>
-          </section>
-          <section class="reasoning-section">
-            <header><h3>5. 最终诊断与建议</h3><span class="hint">${timing.total_duration_ms ?? "-"} ms</span></header>
-            <div class="body">
+            `,
+            false
+          )}
+          ${renderCollapsibleSection(
+            "4. 反思判断",
+            "逐候选复核",
+            `${reviewCards || "<div class='compact-text'>-</div>"}`,
+            false
+          )}
+          ${renderCollapsibleSection(
+            "5. 最终诊断与建议",
+            `${timing.total_duration_ms ?? "-"} ms`,
+            `
               ${finalDiagnosisCards || ""}
               <div class="info-card" style="margin-bottom:10px;">
                 <h4>下一步建议</h4>
@@ -1447,50 +1493,9 @@
                 <h4>风险提示 / 注意事项</h4>
                 <ul class="evidence-list">${renderList(finalRecommendation.cautions || [])}</ul>
               </div>
-            </div>
-          </section>
-        </div>
-      `;
-    }
-
-    function renderTraceability(response) {
-      const phenotypes = response.phenotypes || [];
-      const toolRuns = response.phenotype_tool_runs || [];
-      const evidence = response.knowledge_evidence || [];
-      const similarCases = response.similar_cases || [];
-      const initialCandidates = response.initial_candidates || [];
-      const normalizedCandidates = response.normalized_candidates || [];
-      const reviews = response.reviews || [];
-      const finalRecommendation = response.final_recommendation || {};
-      const diagnosisCards = finalRecommendation.diagnosis_cards || [];
-
-      const hpoRows = phenotypes.map((item) => `<tr><td>${escapeHtml(phenotypePrimaryName(item))}${phenotypeSecondaryName(item) ? `<br><span class="muted">${escapeHtml(phenotypeSecondaryName(item))}</span>` : ""}</td><td>${escapeHtml(item.code || "-")}</td><td>${escapeHtml(item.source || "-")}</td><td>${item.confidence !== null && item.confidence !== undefined ? Number(item.confidence).toFixed(3) : "-"}</td><td>${escapeHtml(item.notes || "-")}</td></tr>`).join("");
-      const toolRows = toolRuns.map((item) => `<tr><td>${escapeHtml(item.source || "-")}</td><td>${badge(item.status === "success" ? "成功" : item.status === "failed" ? "失败" : "跳过", item.status === "success" ? "ok" : item.status === "failed" ? "bad" : "warn")}</td><td>${escapeHtml((item.query || []).join(", ") || "-")}</td><td>${(item.parsed_candidates || []).map((candidate) => escapeHtml(candidate.disease_name)).slice(0, 5).join("<br>") || "-"}</td><td>${escapeHtml(item.error || "-")}</td></tr>`).join("");
-      const evidenceItems = evidence.slice(0, 8).map((item) => `<div class="evidence-item"><div class="title">${escapeHtml(item.title || item.source_id || "-")}</div><div class="meta-line">${escapeHtml(sourceLabel(item.source_type))} · ${escapeHtml(item.source_id || "-")} ${item.url ? `· <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">查看来源</a>` : ""}</div><div class="compact-text">${escapeHtml(item.summary || "-")}</div></div>`).join("");
-      const caseRows = similarCases.map((item) => {
-        const metadata = item.metadata || {};
-        const reference = item.evidence_role === "diagnosis_reference"
-          ? (metadata.source_pmid
-            ? `PMID：${linkOrText(metadata.source_pmid, metadata.source_url || "")}`
-            : "-")
-          : "-";
-        return `<tr><td>${badge(item.evidence_role === "diagnosis_reference" ? "公共确诊病例参考" : "私有历史检测参考", item.evidence_role === "diagnosis_reference" ? "ok" : "warn")}<br>${escapeHtml(item.source || "-")}</td><td>${escapeHtml(item.diagnosis || "-")}<br><span class="muted">${escapeHtml(item.case_id || "-")}</span><br><span class="muted">${reference}</span></td><td>${item.score !== null && item.score !== undefined ? Number(item.score).toFixed(4) : "-"}</td><td>${escapeHtml((item.phenotype_relevant_genes || item.reported_genes || []).slice(0, 6).join(", ") || "-")}</td><td>${escapeHtml((item.summary || "").slice(0, 220))}</td></tr>`;
-      }).join("");
-      const candidateRows = initialCandidates.map((item) => `<tr><td>#${item.rank ?? "-"}</td><td>${escapeHtml(item.name || "-")}</td><td>${item.score !== null && item.score !== undefined ? Number(item.score).toFixed(2) : "-"}</td><td>${escapeHtml((item.rationale || "").slice(0, 260))}</td></tr>`).join("");
-      const normalizedRows = normalizedCandidates.map((item) => `<tr><td>${escapeHtml(item.original_name || "-")}</td><td>${escapeHtml(item.normalized_name || "-")}</td><td>${escapeHtml(item.disease_id || "-")}</td><td>${escapeHtml(item.ontology || "-")}</td></tr>`).join("");
-      const reviewItems = reviews.map((item) => `<div class="evidence-item"><div class="title">${escapeHtml(item.candidate_name || "-")} ${badge(item.is_supported ? "支持" : "不支持", item.is_supported ? "ok" : "bad")} ${badge(`置信度 ${item.confidence ?? "-"}`)}</div><div class="compact-text">${escapeHtml(item.reasoning || "-")}</div></div>`).join("");
-      const diagnosisCardItems = diagnosisCards.map((item, index) => `<div class="evidence-item"><div class="title">#${item.rank || index + 1} ${escapeHtml(diagnosisPrimaryName(item))} ${badge(`支持度 ${item.support_level || "-"}`)}</div>${diagnosisSecondaryName(item) ? `<div class="compact-text muted">${escapeHtml(diagnosisSecondaryName(item))}</div>` : ""}<div class="compact-text"><strong>建议检查：</strong>${escapeHtml((item.recommended_tests || []).join("；") || "-")}</div></div>`).join("");
-
-      $("traceabilityPanel").innerHTML = `
-        <div class="audit-grid">
-          <div class="audit-card"><h4>1. HPO 表型分析</h4><table class="trace-table"><thead><tr><th>表型</th><th>HPO</th><th>来源</th><th>置信度</th><th>备注</th></tr></thead><tbody>${hpoRows || "<tr><td colspan='5'>-</td></tr>"}</tbody></table></div>
-          <div class="audit-card"><h4>2. 表型工具检索</h4><table class="trace-table"><thead><tr><th>工具</th><th>状态</th><th>输入</th><th>候选</th><th>错误</th></tr></thead><tbody>${toolRows || "<tr><td colspan='5'>-</td></tr>"}</tbody></table></div>
-          <div class="audit-card"><h4>3. 资料检索</h4>${evidenceItems || "<div class='compact-text'>-</div>"}</div>
-          <div class="audit-card"><h4>4. 相似案例检索</h4><table class="trace-table"><thead><tr><th>角色/来源</th><th>诊断或检测标签</th><th>分数</th><th>关键词/基因</th><th>摘要</th></tr></thead><tbody>${caseRows || "<tr><td colspan='5'>-</td></tr>"}</tbody></table></div>
-          <div class="audit-card"><h4>5. 初步诊断</h4><table class="trace-table"><thead><tr><th>排序</th><th>候选</th><th>分数</th><th>理由</th></tr></thead><tbody>${candidateRows || "<tr><td colspan='4'>-</td></tr>"}</tbody></table></div>
-          <div class="audit-card"><h4>6. 疾病标准化</h4><table class="trace-table"><thead><tr><th>原始名称</th><th>标准名称</th><th>ID</th><th>体系</th></tr></thead><tbody>${normalizedRows || "<tr><td colspan='4'>-</td></tr>"}</tbody></table></div>
-          <div class="audit-card"><h4>7. 反思复审</h4>${reviewItems || "<div class='compact-text'>-</div>"}</div>
-          <div class="audit-card"><h4>8. 最终诊断建议</h4><div class="compact-text"><strong>总结：</strong>${escapeHtml(productizeSummary(finalRecommendation.summary || "-"))}</div><div style="margin:10px 0;">${diagnosisCardItems || "<div class='compact-text'>-</div>"}</div><div class="compact-text"><strong>下一步：</strong>${escapeHtml((finalRecommendation.next_steps || []).join("；") || "-")}</div><div class="compact-text"><strong>注意事项：</strong>${escapeHtml((finalRecommendation.cautions || []).join("；") || "-")}</div></div>
+            `,
+            true
+          )}
         </div>
       `;
     }
@@ -1616,7 +1621,6 @@
         );
         renderWorkflowSummary(response, timing);
         renderDiagnosisCards(response, timing);
-        renderTraceability(response);
         await refreshTaskMeta();
       } catch (err) {
         setStatus("resultSummary", `加载失败：${err.message}`, "bad");
