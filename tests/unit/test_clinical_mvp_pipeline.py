@@ -644,6 +644,22 @@ def test_final_synthesizer_localizes_fallback_cards_when_final_json_is_invalid()
                     '{"index":0,"disease_name_zh":"复发性葡萄胎","disease_name_en":"Hydatidiform mole"}'
                     ']}'
                 )
+            if "整理诊断卡展示内容" in system_prompt:
+                return (
+                    '{"cards":['
+                    '{'
+                    '"index":0,'
+                    '"clinical_diagnosis":"复发性葡萄胎",'
+                    '"inheritance":"常染色体隐性遗传",'
+                    '"molecular_mechanism":"NLRP7 / KHDC3L 相关印记异常，待患者本人检测确认。",'
+                    '"pathogenesis":"与母体效应基因相关的葡萄胎形成机制待进一步确认。",'
+                    '"specialties":["生殖遗传"],'
+                    '"supporting_evidence":["表型与葡萄胎高度吻合"],'
+                    '"contradicting_evidence":[],'
+                    '"missing_evidence":["需补充患者本人的基因检测结果"],'
+                    '"recommended_tests":["建议进行相关基因检测"]'
+                    '}]}'
+                )
             return "Request timed out."
 
     synthesizer = LlmFinalDiagnosisSynthesizer(api_key="demo", model_name="demo")
@@ -678,6 +694,69 @@ def test_final_synthesizer_localizes_fallback_cards_when_final_json_is_invalid()
     assert recommendation.summary.startswith("Clinical MVP 已按 DeepRare 风格完成一轮可追溯鉴别诊断")
     assert recommendation.diagnosis_cards[0]["disease_name_zh"] == "复发性葡萄胎"
     assert recommendation.diagnosis_cards[0]["disease_name_en"] == "Hydatidiform mole"
+    assert recommendation.diagnosis_cards[0]["clinical_diagnosis"] == "复发性葡萄胎"
+    assert recommendation.diagnosis_cards[0]["supporting_evidence"] == ["表型与葡萄胎高度吻合"]
+    assert recommendation.diagnosis_cards[0]["recommended_tests"] == ["建议进行相关基因检测"]
+
+
+def test_per_disease_verifier_localizes_review_display_fields_to_chinese():
+    class FakeReasoner:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, system_prompt, user_prompt, *, temperature=None, seed=42):
+            self.calls += 1
+            if "整理候选疾病复核结果" in system_prompt:
+                return (
+                    '{"reviews":['
+                    '{'
+                    '"index":0,'
+                    '"reasoning":"结合当前表型与候选疾病知识，临床上支持该诊断，但仍缺少患者本人分子证据。",'
+                    '"supporting_evidence":["高前额（HP:0000294）与该综合征典型表型一致"],'
+                    '"contradicting_evidence":[],'
+                    '"missing_evidence":["需补充患者本人的基因检测结果"]'
+                    '}]}'
+                )
+            return (
+                '{'
+                '"is_supported": true,'
+                '"confidence": 0.85,'
+                '"reasoning":"High forehead matches the syndrome pattern.",'
+                '"evidence_ids":["candidate-orphanet-demo"],'
+                '"supporting_evidence":["High forehead matches the syndrome pattern."],'
+                '"contradicting_evidence":[],'
+                '"missing_evidence":["No molecular confirmation yet."]'
+                '}'
+            )
+
+    verifier = LlmPerDiseaseVerifier(api_key="demo", model_name="demo")
+    verifier._orphanet = {
+        "ORPHA:199": {
+            "name": "Cornelia de Lange syndrome",
+            "expert_link": "https://example.org/orpha199",
+            "hpo_associations": [["High forehead", "HP:0000294", "Frequent"]],
+        }
+    }
+    verifier._reasoner = FakeReasoner()
+
+    reviews = verifier.verify(
+        patient=PatientProfile(patient_id="case-review-zh", raw_note="高前额，喂养困难。"),
+        phenotypes=[PhenotypeItem(label="High forehead", code="HP:0000294")],
+        similar_cases=[],
+        knowledge_evidence=[],
+        normalized_candidates=[
+            NormalizedDisease(
+                original_name="Cornelia de Lange syndrome",
+                normalized_name="Cornelia de Lange syndrome",
+                disease_id="ORPHA:199",
+                ontology="Orphanet",
+            )
+        ],
+    )
+
+    assert reviews[0].reasoning.startswith("结合当前表型与候选疾病知识")
+    assert reviews[0].supporting_evidence == ["高前额（HP:0000294）与该综合征典型表型一致"]
+    assert reviews[0].missing_evidence == ["需补充患者本人的基因检测结果"]
 
 
 def test_unconfirmed_molecular_candidate_name_is_softened_without_patient_variant():

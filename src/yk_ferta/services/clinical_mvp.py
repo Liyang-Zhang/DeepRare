@@ -64,6 +64,10 @@ def _contains_cjk(value: str) -> bool:
     return bool(re.search(r"[\u4e00-\u9fff]", value or ""))
 
 
+def _contains_latin_text(value: str) -> bool:
+    return bool(re.search(r"[A-Za-z]", value or ""))
+
+
 def _safe_float(value: object, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -2648,6 +2652,116 @@ class LlmPerDiseaseVerifier:
             deduped.append(item)
         return deduped
 
+    @staticmethod
+    def _review_needs_chinese_localization(review: CandidateReview) -> bool:
+        values = [review.reasoning]
+        values.extend(review.supporting_evidence or [])
+        values.extend(review.contradicting_evidence or [])
+        values.extend(review.missing_evidence or [])
+        return any(_contains_latin_text(_normalize_text(str(item))) for item in values if item)
+
+    def _localize_reviews_for_chinese_display(
+        self,
+        reviews: list[CandidateReview],
+    ) -> list[CandidateReview]:
+        pending = [
+            (index, review)
+            for index, review in enumerate(reviews)
+            if self._review_needs_chinese_localization(review)
+        ]
+        if not pending or not self.api_key:
+            return reviews
+
+        self._ensure_loaded()
+        if self._reasoner is None:
+            return reviews
+
+        payload = []
+        for index, review in pending:
+            payload.append(
+                {
+                    "index": index,
+                    "candidate_name": review.candidate_name,
+                    "reasoning": review.reasoning,
+                    "supporting_evidence": list(review.supporting_evidence or []),
+                    "contradicting_evidence": list(review.contradicting_evidence or []),
+                    "missing_evidence": list(review.missing_evidence or []),
+                }
+            )
+
+        prompt = (
+            "只返回 JSON，不要输出 Markdown 或额外解释。JSON 结构为 "
+            "{\"reviews\":[{\"index\":0,\"reasoning\":\"中文说明\",\"supporting_evidence\":[\"...\"],"
+            "\"contradicting_evidence\":[\"...\"],\"missing_evidence\":[\"...\"]}]}。\n\n"
+            "任务：把候选疾病复核结果整理成适合中文医生阅读的展示形式。\n"
+            "规则：\n"
+            "1. reasoning、supporting_evidence、contradicting_evidence、missing_evidence 必须以中文为主。\n"
+            "2. HPO、OMIM、基因名、文献标题、综合征英文缩写可保留英文，但不要直接输出整句英文。\n"
+            "3. 不新增事实，不改变支持/反对/缺失的原意，只做展示语言整理。\n"
+            "4. 列表条目尽量简洁，适合前端直接展示。\n\n"
+            f"待处理复核结果：\n{json.dumps(payload, ensure_ascii=False)}"
+        )
+        raw = self._reasoner.complete(
+            "你正在为中文临床产品整理候选疾病复核结果。目标是保留原始医学含义，同时把展示文本统一成中文。",
+            prompt,
+            temperature=0.0,
+            seed=42,
+        )
+        parsed = _safe_json_loads(raw or "")
+        if not isinstance(parsed, dict):
+            return reviews
+        localized_items = parsed.get("reviews", [])
+        if not isinstance(localized_items, list):
+            return reviews
+
+        localized_by_index: dict[int, dict[str, object]] = {}
+        for item in localized_items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                index = int(item.get("index"))
+            except Exception:
+                continue
+            localized_by_index[index] = item
+
+        localized_reviews: list[CandidateReview] = []
+        for index, review in enumerate(reviews):
+            item = localized_by_index.get(index)
+            if not item:
+                localized_reviews.append(review)
+                continue
+            localized_reviews.append(
+                CandidateReview(
+                    candidate_name=review.candidate_name,
+                    is_supported=review.is_supported,
+                    confidence=review.confidence,
+                    reasoning=_truncate(
+                        _normalize_text(str(item.get("reasoning", ""))) or review.reasoning,
+                        1200,
+                    ),
+                    evidence_ids=list(review.evidence_ids or []),
+                    supporting_evidence=[
+                        _normalize_text(str(v))
+                        for v in item.get("supporting_evidence", [])[:8]
+                        if _normalize_text(str(v))
+                    ]
+                    or list(review.supporting_evidence or []),
+                    contradicting_evidence=[
+                        _normalize_text(str(v))
+                        for v in item.get("contradicting_evidence", [])[:8]
+                        if _normalize_text(str(v))
+                    ]
+                    or list(review.contradicting_evidence or []),
+                    missing_evidence=[
+                        _normalize_text(str(v))
+                        for v in item.get("missing_evidence", [])[:8]
+                        if _normalize_text(str(v))
+                    ]
+                    or list(review.missing_evidence or []),
+                )
+            )
+        return localized_reviews
+
     def verify(
         self,
         patient: PatientProfile,
@@ -2752,7 +2866,8 @@ class LlmPerDiseaseVerifier:
                 "\"reasoning\": \"...\", \"evidence_ids\": [\"...\"], "
                 "\"supporting_evidence\": [\"...\"], \"contradicting_evidence\": [\"...\"], "
                 "\"missing_evidence\": [\"...\"]}.\n\n"
-                "输出语言要求：reasoning 必须以中文为主；疾病英文名、HPO、OMIM、基因名、文献标题可保留英文。\n\n"
+                "输出语言要求：reasoning、supporting_evidence、contradicting_evidence、missing_evidence "
+                "必须以中文为主；疾病英文名、HPO、OMIM、基因名、文献标题可保留英文，但不要直接输出整句英文。\n\n"
                 f"候选疾病：{candidate.normalized_name}\n"
                 f"标准化 ID：{candidate.disease_id or '无'} / {candidate.ontology}\n\n"
                 f"病例信息：\n{patient.narrative()}\n\n"
@@ -2835,7 +2950,7 @@ class LlmPerDiseaseVerifier:
                         else [],
                     )
                 )
-        return reviews
+        return self._localize_reviews_for_chinese_display(reviews)
 
 
 @dataclass(slots=True)
@@ -2951,6 +3066,24 @@ class LlmFinalDiagnosisSynthesizer:
         zh_name = _normalize_text(str(card.get("disease_name_zh", "")))
         return bool(zh_name) and not _contains_cjk(zh_name)
 
+    @staticmethod
+    def _card_content_needs_chinese_localization(card: dict[str, object]) -> bool:
+        values: list[str] = [
+            _normalize_text(str(card.get("clinical_diagnosis", ""))),
+            _normalize_text(str(card.get("inheritance", ""))),
+            _normalize_text(str(card.get("molecular_mechanism", ""))),
+            _normalize_text(str(card.get("pathogenesis", ""))),
+        ]
+        for key in [
+            "specialties",
+            "supporting_evidence",
+            "contradicting_evidence",
+            "missing_evidence",
+            "recommended_tests",
+        ]:
+            values.extend(_normalize_text(str(item)) for item in card.get(key, []) if item)
+        return any(_contains_latin_text(value) for value in values if value)
+
     def _localize_diagnosis_cards(
         self,
         diagnosis_cards: list[dict[str, object]],
@@ -3037,6 +3170,108 @@ class LlmFinalDiagnosisSynthesizer:
                 updated["disease_name_en"] = _normalize_text(str(updated.get("clinical_diagnosis", "")))
             merged_cards.append(updated)
         return merged_cards
+
+    def _localize_diagnosis_card_content(
+        self,
+        diagnosis_cards: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        pending = [
+            (index, card)
+            for index, card in enumerate(diagnosis_cards)
+            if self._card_content_needs_chinese_localization(card)
+        ]
+        if not pending or not self.api_key:
+            return diagnosis_cards
+
+        self._ensure_reasoner()
+        if self._reasoner is None:
+            return diagnosis_cards
+
+        payload = []
+        for index, card in pending:
+            payload.append(
+                {
+                    "index": index,
+                    "disease_name_zh": _normalize_text(str(card.get("disease_name_zh", ""))),
+                    "disease_name_en": _normalize_text(str(card.get("disease_name_en", ""))),
+                    "clinical_diagnosis": _normalize_text(str(card.get("clinical_diagnosis", ""))),
+                    "inheritance": _normalize_text(str(card.get("inheritance", ""))),
+                    "molecular_mechanism": _normalize_text(str(card.get("molecular_mechanism", ""))),
+                    "pathogenesis": _normalize_text(str(card.get("pathogenesis", ""))),
+                    "specialties": list(card.get("specialties", [])),
+                    "supporting_evidence": list(card.get("supporting_evidence", [])),
+                    "contradicting_evidence": list(card.get("contradicting_evidence", [])),
+                    "missing_evidence": list(card.get("missing_evidence", [])),
+                    "recommended_tests": list(card.get("recommended_tests", [])),
+                }
+            )
+
+        prompt = (
+            "只返回 JSON，不要输出 Markdown 或额外解释。JSON 结构为 "
+            "{\"cards\":[{\"index\":0,\"clinical_diagnosis\":\"中文临床诊断\","
+            "\"inheritance\":\"...\",\"molecular_mechanism\":\"...\",\"pathogenesis\":\"...\","
+            "\"specialties\":[\"...\"],\"supporting_evidence\":[\"...\"],"
+            "\"contradicting_evidence\":[\"...\"],\"missing_evidence\":[\"...\"],"
+            "\"recommended_tests\":[\"...\"]}]}。\n\n"
+            "任务：把最终诊断卡中的医生展示内容统一整理成中文。\n"
+            "规则：\n"
+            "1. clinical_diagnosis、inheritance、molecular_mechanism、pathogenesis、specialties、"
+            "supporting_evidence、contradicting_evidence、missing_evidence、recommended_tests 必须以中文为主。\n"
+            "2. HPO、OMIM、Orphanet、基因名、文献标题、疾病英文缩写可保留英文，但不要整句使用英文。\n"
+            "3. 只做展示语言整理，不新增事实、不改变医学结论和证据方向。\n"
+            "4. 列表条目尽量简洁，适合中文医生直接阅读。\n\n"
+            f"待处理诊断卡：\n{json.dumps(payload, ensure_ascii=False)}"
+        )
+        raw = self._reasoner.complete(
+            "你正在为中文临床产品整理诊断卡展示内容。目标是保留原始医学含义，同时把展示字段稳定转换为中文。",
+            prompt,
+            temperature=0.0,
+            seed=42,
+        )
+        parsed = _safe_json_loads(raw or "")
+        if not isinstance(parsed, dict):
+            return diagnosis_cards
+        localized_items = parsed.get("cards", [])
+        if not isinstance(localized_items, list):
+            return diagnosis_cards
+
+        localized_by_index: dict[int, dict[str, object]] = {}
+        for item in localized_items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                index = int(item.get("index"))
+            except Exception:
+                continue
+            localized_by_index[index] = item
+
+        updated_cards: list[dict[str, object]] = []
+        for index, card in enumerate(diagnosis_cards):
+            localized = localized_by_index.get(index)
+            if not localized:
+                updated_cards.append(card)
+                continue
+            updated = dict(card)
+            for field_name in ["clinical_diagnosis", "inheritance", "molecular_mechanism", "pathogenesis"]:
+                value = _normalize_text(str(localized.get(field_name, "")))
+                if value:
+                    updated[field_name] = value
+            for field_name in [
+                "specialties",
+                "supporting_evidence",
+                "contradicting_evidence",
+                "missing_evidence",
+                "recommended_tests",
+            ]:
+                values = [
+                    _normalize_text(str(v))
+                    for v in localized.get(field_name, [])[:8]
+                    if _normalize_text(str(v))
+                ]
+                if values:
+                    updated[field_name] = values
+            updated_cards.append(updated)
+        return updated_cards
 
     def _fallback_diagnosis_cards(
         self,
@@ -3366,6 +3601,7 @@ class LlmFinalDiagnosisSynthesizer:
             has_patient_molecular_evidence,
         )
         localized_fallback_cards = self._localize_diagnosis_cards(fallback_cards) if self.api_key else fallback_cards
+        localized_fallback_cards = self._localize_diagnosis_card_content(localized_fallback_cards)
         fallback_final_confidence, fallback_final_confidence_percent = self._top_final_diagnosis_confidence(
             localized_fallback_cards
         )
@@ -3414,10 +3650,13 @@ class LlmFinalDiagnosisSynthesizer:
             "\"cautions\":[\"...\"]}],"
             "\"next_steps\":[\"...\"],\"cautions\":[\"...\"]}.\n\n"
             "输出语言要求：summary、diagnosis_cards、next_steps、cautions 必须以中文为主；疾病英文名、HPO、OMIM、"
-            "PubMed 标题、基因名等必要英文术语可保留英文。\n\n"
+            "PubMed 标题、基因名等必要英文术语可保留英文，但不要直接输出整句英文。\n\n"
             "疾病名展示要求：disease_name_zh 必须尽量给出中文疾病名。若没有标准中文译名，"
             "请给出医生能理解的中文译名并在 disease_name_en 保留英文原名；"
             "不要只把英文疾病名放在 disease_name_zh 中。\n\n"
+            "诊断卡展示要求：clinical_diagnosis、inheritance、molecular_mechanism、pathogenesis、"
+            "specialties、supporting_evidence、contradicting_evidence、missing_evidence、recommended_tests "
+            "也必须以中文为主；可保留 HPO、OMIM、PubMed 标题和基因名，但不要整句保留英文。\n\n"
             "疾病分子信息要求：disease_genes 和 molecular_mechanism 表示该疾病在知识库中的致病基因、"
             "染色体区域或分子/遗传机制，不代表当前患者已经检出相关异常。"
             "如果证据不足，填写 NA 或“待确认”。不要输出“分子亚型”概念，也不要把另一个候选疾病当作本病的分子机制。\n\n"
@@ -3541,6 +3780,7 @@ class LlmFinalDiagnosisSynthesizer:
                     )
             diagnosis_cards = self._merge_llm_cards_with_canonical_ranking(diagnosis_cards, fallback_cards)
             diagnosis_cards = self._localize_diagnosis_cards(diagnosis_cards)
+            diagnosis_cards = self._localize_diagnosis_card_content(diagnosis_cards)
             final_confidence, final_confidence_percent = self._top_final_diagnosis_confidence(
                 diagnosis_cards or fallback_cards
             )
