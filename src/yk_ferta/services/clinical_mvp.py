@@ -189,10 +189,17 @@ def _soften_unconfirmed_molecular_candidate(
 
 
 class _OpenAIReasoner:
-    def __init__(self, api_key: str, model_name: str, base_url: str = "") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str,
+        base_url: str = "",
+        *,
+        timeout: int = 60,
+    ) -> None:
         from api.interface import Openai_api
 
-        self._api = Openai_api(api_key, model_name, base_url=base_url)
+        self._api = Openai_api(api_key, model_name, base_url=base_url, timeout=timeout)
 
     def complete(
         self,
@@ -2960,11 +2967,17 @@ class LlmFinalDiagnosisSynthesizer:
     api_key: str
     model_name: str
     base_url: str = ""
+    request_timeout_seconds: int = 300
     _reasoner: _OpenAIReasoner | None = None
 
     def _ensure_reasoner(self) -> None:
         if self._reasoner is None:
-            self._reasoner = _OpenAIReasoner(self.api_key, self.model_name, self.base_url)
+            self._reasoner = _OpenAIReasoner(
+                self.api_key,
+                self.model_name,
+                self.base_url,
+                timeout=self.request_timeout_seconds,
+            )
 
     @staticmethod
     def _clamp_score(value: float | None, *, default: float = 0.0) -> float:

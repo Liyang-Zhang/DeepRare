@@ -1015,6 +1015,27 @@ def test_final_synthesis_sorts_candidates_by_normalized_review_mapping():
     assert "复核置信度=0.90" in recommendation.diagnosis_cards[0]["ranking_reason"]
 
 
+def test_final_synthesizer_uses_extended_timeout(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class FakeReasoner:
+        def __init__(self, api_key, model_name, base_url="", *, timeout=60):
+            captured["api_key"] = api_key
+            captured["model_name"] = model_name
+            captured["base_url"] = base_url
+            captured["timeout"] = timeout
+
+    monkeypatch.setattr(
+        "yk_ferta.services.clinical_mvp._OpenAIReasoner",
+        FakeReasoner,
+    )
+
+    synthesizer = LlmFinalDiagnosisSynthesizer(api_key="demo", model_name="demo")
+    synthesizer._ensure_reasoner()
+
+    assert captured["timeout"] == 300
+
+
 def test_local_disease_normalizer_uses_deeprare_style_top1_recall(monkeypatch):
     import torch
 
